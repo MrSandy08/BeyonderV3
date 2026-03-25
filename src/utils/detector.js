@@ -27,19 +27,19 @@ export async function analyzeImage(buffer) {
       return { isNsfw: false, isGore: false, error: result.error };
     }
 
-    // Adaptar respuesta de NudeNet 3.x
-    // detections suele ser una lista de objetos con label y score
-    const detections = result.detections || [];
+    // Adaptar respuesta del nuevo servidor (CLIP + NudeNet)
+    const nsfwDetections = result.nsfw || [];
+    const goreResult = result.gore || { is_gore: false, confidence: 0 };
     
     // Clasificación básica NSFW basada en etiquetas comunes de NudeNet
     const labelsNSFW = ['BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED'];
-    const nsfwDetection = detections.find(d => labelsNSFW.includes(d.class) && d.score > 0.70);
+    const nsfwDetection = nsfwDetections.find(d => labelsNSFW.includes(d.class) && d.score > 0.70);
 
     return {
       isNsfw: !!nsfwDetection,
       nsfwScore: nsfwDetection ? nsfwDetection.score : 0,
-      isGore: false, // El Space básico solo maneja NudeNet por ahora
-      goreScore: 0,
+      isGore: goreResult.is_gore,
+      goreScore: goreResult.confidence,
       isAnime: false,
       threshold: 0.70
     };

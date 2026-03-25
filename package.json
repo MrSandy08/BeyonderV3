@@ -1,0 +1,43 @@
+{
+  "name": "beyonder-v3",
+  "version": "3.0.0",
+  "description": "Beyonder v3 — Roleplay, IA y Moderación Organizada",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "@gradio/client": "^1.6.0",
+    "@hapi/boom": "^10.0.1",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.13.6",
+    "canvas": "^3.2.2",
+    "concurrently": "^9.2.1",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "form-data": "^4.0.5",
+    "mongo-baileys": "^1.0.1",
+    "mongodb": "^7.1.1",
+    "mongoose": "^8.4.1",
+    "ollama": "^0.6.3",
+    "p-queue": "^9.1.0",
+    "pino": "^9.2.0",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.34.5",
+    "wa-sticker-formatter": "^4.0.3",
+    "yt-dlp-exec": "^1.0.2",
+    "yt-search": "^2.13.1",
+    "ytdl-core": "github:fent/node-ytdl-core#master"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

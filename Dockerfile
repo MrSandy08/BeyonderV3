@@ -1,12 +1,15 @@
 # Imagen base con Python y Node.js
 FROM nikolaik/python-nodejs:python3.12-nodejs20-slim
 
-# Instalamos las librerías de sistema necesarias (GLib, etc.)
+# Instalamos las librerías de sistema necesarias (Modernas para Debian/Ubuntu)
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
-    git \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     ffmpeg \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

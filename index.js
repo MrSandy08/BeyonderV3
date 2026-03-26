@@ -11,7 +11,7 @@ import pino from "pino";
 import qrcode from "qrcode-terminal";
 
 import connectDB      from "./src/database/connection.js";
-import { MONGO_URI, PORT } from "./src/config.js";
+import { MONGO_URI, PORT, PHONE_NUMBER } from "./src/config.js";
 import cargarComandos from "./src/handlers/commandHandler.js";
 import handleMessages from "./src/events/messages.js";
 
@@ -40,8 +40,21 @@ const conectarWhatsApp = async (comandos) => {
       auth:                state,
       logger:              pino({ level: "silent" }),
       markOnlineOnConnect: false,
-      printQRInTerminal:   false, // lo manejamos nosotros
+      printQRInTerminal:   !PHONE_NUMBER, // Solo imprime QR si NO hay número para vincular
     });
+
+    // ── Lógica de Código de Vinculación (Pairing Code) ───────────────────────
+    if (PHONE_NUMBER && !sock.authState.creds.registered) {
+      console.log(`\n📲 Generando código de vinculación para: ${PHONE_NUMBER}`);
+      setTimeout(async () => {
+        try {
+          const code = await sock.requestPairingCode(PHONE_NUMBER);
+          console.log(`\n🔗 TU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
+        } catch (e) {
+          console.error("❌ Error al solicitar código de vinculación:", e.message);
+        }
+      }, 3000); // Pequeño delay para asegurar que el socket esté listo
+    }
 
     // ── Guardar credenciales al actualizarse ────────────────────────────────
     sock.ev.on("creds.update", saveCreds);
@@ -50,7 +63,7 @@ const conectarWhatsApp = async (comandos) => {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
+      if (qr && !PHONE_NUMBER) {
         console.log("\n📱 Escanea este QR con tu WhatsApp:\n");
         qrcode.generate(qr, { small: true });
       }

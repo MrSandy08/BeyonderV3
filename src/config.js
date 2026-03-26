@@ -16,6 +16,7 @@ export const OWNERS = process.env.OWNER_JID
   ? process.env.OWNER_JID.split(",").map((jid) => jid.trim())
   : [];
 export const YOUTUBE_COOKIES = process.env.YOUTUBE_COOKIES || "";
+export const PHONE_NUMBER = process.env.PHONE_NUMBER || "";
 
 const config = {
   MONGO_URI,
@@ -23,6 +24,7 @@ const config = {
   PREFIX,
   OWNERS,
   YOUTUBE_COOKIES,
+  PHONE_NUMBER,
 };
 
 if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {

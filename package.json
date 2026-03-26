@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
+    "start": "concurrently \"uvicorn main:app --host 0.0.0.0 --port 7860\" \"node index.js\"",
     "dev": "node --watch index.js"
   },
   "dependencies": {

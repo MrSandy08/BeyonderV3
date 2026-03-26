@@ -6,7 +6,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 // ── CONFIGURACIÓN INTERNA (HUGGING FACE) ─────────────────────────────────────
-const AI_SERVER_URL = "http://127.0.0.1:8000/detect";
+const AI_SERVER_URL = `http://127.0.0.1:${process.env.PORT || 7860}/detect`;
 
 /**
  * Analiza una imagen enviándola al servidor FastAPI en Hugging Face.

@@ -80,6 +80,12 @@ const main = async () => {
   console.log("🚀 Iniciando Beyonder v3...\n");
 
   // 1. Base de datos primero — si falla, el proceso termina (ver connection.js)
+  console.log("Intentando conectar a DB...");
+  if (config.MONGO_URI.includes("127.0.0.1") || config.MONGO_URI.includes("localhost")) {
+    console.log("ℹ️ Usando conexión local.");
+  } else {
+    console.log("✅ Detectada variable MONGO_URI externa.");
+  }
   await connectDB();
 
   // 2. Cargar todos los comandos antes de abrir el socket

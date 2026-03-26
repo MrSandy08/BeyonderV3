@@ -19,18 +19,25 @@ print("Modelos cargados correctamente.")
 
 def detect_gore(image_path):
     image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
-    # Etiquetas para comparar violencia y gore
-    text_descriptions = ["a photo of gore", "a photo of blood and violence", "a normal photo"]
+    # Etiquetas más descriptivas para mejorar la detección de CLIP
+    text_descriptions = [
+        "a photo of gore and blood", 
+        "a photo of a dead person or body parts", 
+        "a photo of extreme violence",
+        "a normal photo of people",
+        "a landscape or object"
+    ]
     text_tokens = clip.tokenize(text_descriptions).to(device)
 
     with torch.no_grad():
         logits_per_image, _ = model(image, text_tokens)
         probs = logits_per_image.softmax(dim=-1).cpu().numpy()
     
-    # Si la probabilidad de las etiquetas de violencia es alta, es Gore
-    is_gore = probs[0][0] > 0.6 or probs[0][1] > 0.6
-    confidence = float(max(probs[0][0], probs[0][1]))
-    return {"is_gore": bool(is_gore), "confidence": confidence}
+    # Sumar probabilidades de etiquetas violentas
+    gore_score = float(probs[0][0] + probs[0][1] + probs[0][2])
+    is_gore = gore_score > 0.50 # Umbral más sensible
+    
+    return {"is_gore": bool(is_gore), "confidence": gore_score}
 
 @app.get("/")
 def home():

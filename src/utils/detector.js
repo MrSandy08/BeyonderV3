@@ -32,14 +32,28 @@ export async function analyzeImage(buffer) {
     const goreResult = result.gore || { is_gore: false, confidence: 0 };
     
     // Clasificación básica NSFW basada en etiquetas comunes de NudeNet
-    const labelsNSFW = ['BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED'];
-    const nsfwDetection = nsfwDetections.find(d => labelsNSFW.includes(d.class) && d.score > 0.70);
+    // NudeNet devuelve una lista de detecciones. Buscamos la de mayor puntuación de desnudez.
+    const labelsNSFW = [
+      'BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 
+      'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED', 'BELLY_EXPOSED', 'MALE_BREAST_EXPOSED'
+    ];
+    
+    // Filtrar solo las etiquetas que consideramos NSFW
+    const nsfwHits = nsfwDetections.filter(d => labelsNSFW.includes(d.class));
+    
+    // Obtener el score más alto de las detecciones NSFW
+    const maxNsfwScore = nsfwHits.length > 0 
+      ? Math.max(...nsfwHits.map(d => d.score)) 
+      : 0;
+
+    // Asegurar que Gore Score sea numérico
+    const goreScore = typeof goreResult.confidence === 'number' ? goreResult.confidence : 0;
 
     return {
-      isNsfw: !!nsfwDetection,
-      nsfwScore: nsfwDetection ? nsfwDetection.score : 0,
-      isGore: goreResult.is_gore,
-      goreScore: goreResult.confidence,
+      isNsfw: maxNsfwScore > 0.70,
+      nsfwScore: maxNsfwScore,
+      isGore: goreResult.is_gore || goreScore > 0.50,
+      goreScore: goreScore,
       isAnime: false,
       threshold: 0.70
     };

@@ -9,6 +9,7 @@ import { analyzeImage } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
 import ytdlp from "yt-dlp-exec";
+import ytdl from "ytdl-core";
 import fs from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -101,7 +102,35 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
     }
 
     // Ejecutar descarga
-    await ytdlp(url, options);
+    try {
+      await ytdlp(url, options);
+    } catch (err) {
+      console.warn("⚠️ yt-dlp falló, intentando fallback con ytdl-core...");
+      
+      if (type === "audio") {
+        const stream = ytdl(url, { 
+          quality: 'highestaudio',
+          filter: 'audioonly',
+          requestOptions: {
+            headers: {
+              'User-Agent': options.userAgent,
+              'Cookie': config.YOUTUBE_COOKIES || ""
+            }
+          }
+        });
+        
+        const writeStream = fs.createWriteStream(outputPath);
+        stream.pipe(writeStream);
+        
+        await new Promise((resolve, reject) => {
+          writeStream.on('finish', resolve);
+          writeStream.on('error', reject);
+          stream.on('error', reject);
+        });
+      } else {
+        throw err; // Para video no tenemos un fallback sencillo que fusione audio/video sin ffmpeg externo
+      }
+    }
 
     if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
       throw new Error("El archivo descargado está vacío o no existe.");

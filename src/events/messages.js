@@ -9,13 +9,18 @@ import { analyzeImage } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
 import ytdlp from "yt-dlp-exec";
-import ytdl from "ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import fs from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import crypto from "crypto";
 import sharp from "sharp";
 import PQueue from "p-queue";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
+
+// Configurar ffmpeg
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 // ── Cola de Procesamiento IA ──────────────────────────────────────────────────
 const iaQueue = new PQueue({ concurrency: 1 }); // Procesar de 1 en 1 para no saturar
@@ -103,32 +108,41 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 
     // Ejecutar descarga
     try {
+      if (!config.YOUTUBE_COOKIES) {
+        console.warn("⚠️ Advertencia: No se han configurado YOUTUBE_COOKIES. Las descargas pueden fallar con Error 403 o 410.");
+      }
+      
       await ytdlp(url, options);
     } catch (err) {
-      console.warn("⚠️ yt-dlp falló, intentando fallback con ytdl-core...");
+      console.warn(`⚠️ yt-dlp falló (${err.message}). Intentando fallback con @distube/ytdl-core...`);
       
       if (type === "audio") {
-        const stream = ytdl(url, { 
-          quality: 'highestaudio',
-          filter: 'audioonly',
-          requestOptions: {
-            headers: {
-              'User-Agent': options.userAgent,
-              'Cookie': config.YOUTUBE_COOKIES || ""
-            }
-          }
-        });
-        
-        const writeStream = fs.createWriteStream(outputPath);
-        stream.pipe(writeStream);
-        
-        await new Promise((resolve, reject) => {
-          writeStream.on('finish', resolve);
-          writeStream.on('error', reject);
-          stream.on('error', reject);
-        });
+        try {
+          const agentOptions = config.YOUTUBE_COOKIES 
+            ? { requestOptions: { headers: { 'Cookie': config.YOUTUBE_COOKIES } } }
+            : {};
+
+          const stream = ytdl(url, { 
+            quality: 'highestaudio',
+            filter: 'audioonly',
+            ...agentOptions
+          });
+          
+          const writeStream = fs.createWriteStream(outputPath);
+          stream.pipe(writeStream);
+          
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Timeout en fallback de audio")), 60000);
+            writeStream.on('finish', () => { clearTimeout(timeout); resolve(); });
+            writeStream.on('error', (e) => { clearTimeout(timeout); reject(e); });
+            stream.on('error', (e) => { clearTimeout(timeout); reject(e); });
+          });
+        } catch (fallbackErr) {
+          console.error("❌ Fallback de ytdl-core también falló:", fallbackErr.message);
+          throw new Error("YouTube bloqueó todos los intentos de descarga (Error 410/403). Verifica tus YOUTUBE_COOKIES.");
+        }
       } else {
-        throw err; // Para video no tenemos un fallback sencillo que fusione audio/video sin ffmpeg externo
+        throw err;
       }
     }
 
@@ -278,6 +292,30 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               if (!buffer || buffer.length === 0) {
                 console.error(`❌ [IA] Error: Buffer vacío para @${sender.split("@")[0]}. Cancelando análisis.`);
                 return false;
+              }
+
+              // EXTRAER FRAME DE VIDEO SI ES NECESARIO
+              if (msg.type === 'videoMessage') {
+                const videoPath = join(tmpdir(), `temp_ia_${Date.now()}.mp4`);
+                const framePath = join(tmpdir(), `temp_ia_frame_${Date.now()}.jpg`);
+                fs.writeFileSync(videoPath, buffer);
+                
+                await new Promise((resolve, reject) => {
+                  ffmpeg(videoPath)
+                    .screenshot({
+                      timestamps: ['00:00:01'],
+                      filename: framePath,
+                      folder: tmpdir(),
+                    })
+                    .on('end', resolve)
+                    .on('error', reject);
+                });
+                
+                if (fs.existsSync(framePath)) {
+                  buffer = fs.readFileSync(framePath);
+                  fs.unlinkSync(framePath);
+                }
+                if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
               }
 
               // OPTIMIZACIÓN SHARP: Flatten para transparencia

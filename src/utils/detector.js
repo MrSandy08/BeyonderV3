@@ -35,9 +35,15 @@ export async function analyzeImage(buffer) {
     // NudeNet devuelve una lista de detecciones. Buscamos la de mayor puntuación de desnudez.
     const labelsNSFW = [
       'BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 
-      'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED', 'BELLY_EXPOSED', 'MALE_BREAST_EXPOSED'
+      'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED', 'MALE_BREAST_EXPOSED',
+      'PHALLUS_EXPOSED', 'BREAST_EXPOSED', 'VULVA_EXPOSED', 'PUBIC_HAIR_EXPOSED'
     ];
     
+    // Log para depuración interna (ver qué está viendo la IA)
+    if (nsfwDetections.length > 0) {
+      console.log(`[DEBUG IA] Detecciones NudeNet: ${nsfwDetections.map(d => `${d.class}(${(d.score*100).toFixed(0)}%)`).join(', ')}`);
+    }
+
     // Filtrar solo las etiquetas que consideramos NSFW
     const nsfwHits = nsfwDetections.filter(d => labelsNSFW.includes(d.class));
     

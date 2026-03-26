@@ -9,6 +9,9 @@ const connectDB = async () => {
     }
     await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 5000, // falla rápido si Mongo no responde
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+      family: 4, // Priorizar IPv4 para evitar lentitud en algunos entornos
     });
     console.log("✅ MongoDB conectado");
   } catch (error) {

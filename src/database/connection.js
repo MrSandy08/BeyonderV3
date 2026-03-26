@@ -1,10 +1,13 @@
 // src/database/connection.js
 import mongoose from "mongoose";
-import config from "../config.js";
+import { MONGO_URI } from "../config.js";
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(config.MONGO_URI, {
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI no está definido en el entorno.");
+    }
+    await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 5000, // falla rápido si Mongo no responde
     });
     console.log("✅ MongoDB conectado");

@@ -11,7 +11,7 @@ import pino from "pino";
 import qrcode from "qrcode-terminal";
 
 import connectDB      from "./src/database/connection.js";
-import config         from "./src/config.js";
+import { MONGO_URI, PORT } from "./src/config.js";
 import cargarComandos from "./src/handlers/commandHandler.js";
 import handleMessages from "./src/events/messages.js";
 
@@ -20,7 +20,14 @@ import handleMessages from "./src/events/messages.js";
 // ════════════════════════════════════════════════════════════════════════════
 const conectarWhatsApp = async (comandos) => {
 
-  const client = new MongoClient(config.MONGO_URI);
+  console.log("Intentando conectar a DB para sesión...");
+  if (!MONGO_URI) {
+    console.error("❌ ERROR: MONGO_URI no está definido.");
+  } else {
+    console.log(`✅ MONGO_URI detectado: ${MONGO_URI.substring(0, 15)}...`);
+  }
+
+  const client = new MongoClient(MONGO_URI);
   await client.connect();
   const db = client.db("BeyonderV3");
   const collection = db.collection("auth");
@@ -81,7 +88,7 @@ const main = async () => {
 
   // 1. Base de datos primero — si falla, el proceso termina (ver connection.js)
   console.log("Intentando conectar a DB...");
-  if (config.MONGO_URI.includes("127.0.0.1") || config.MONGO_URI.includes("localhost")) {
+  if (MONGO_URI.includes("127.0.0.1") || MONGO_URI.includes("localhost")) {
     console.log("ℹ️ Usando conexión local.");
   } else {
     console.log("✅ Detectada variable MONGO_URI externa.");

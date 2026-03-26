@@ -102,7 +102,14 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 
     // Agregar cookies si están configuradas
     if (config.YOUTUBE_COOKIES) {
-      fs.writeFileSync(cookiePath, config.YOUTUBE_COOKIES);
+      try {
+        // Intentar guardar como JSON si es un array válido
+        JSON.parse(config.YOUTUBE_COOKIES);
+        fs.writeFileSync(cookiePath, config.YOUTUBE_COOKIES);
+      } catch (e) {
+        // Si no es JSON, guardar como texto plano (formato Netscape)
+        fs.writeFileSync(cookiePath, config.YOUTUBE_COOKIES);
+      }
       options.cookies = cookiePath;
     }
 
@@ -118,14 +125,20 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
       
       if (type === "audio") {
         try {
-          const agentOptions = config.YOUTUBE_COOKIES 
-            ? { requestOptions: { headers: { 'Cookie': config.YOUTUBE_COOKIES } } }
-            : {};
+          let agent;
+          if (config.YOUTUBE_COOKIES) {
+            try {
+              const cookiesArray = JSON.parse(config.YOUTUBE_COOKIES);
+              agent = ytdl.createAgent(Array.isArray(cookiesArray) ? cookiesArray : []);
+            } catch (e) {
+              console.warn("⚠️ Las cookies no están en formato JSON. ytdl-core podría fallar.");
+            }
+          }
 
           const stream = ytdl(url, { 
             quality: 'highestaudio',
             filter: 'audioonly',
-            ...agentOptions
+            agent: agent
           });
           
           const writeStream = fs.createWriteStream(outputPath);

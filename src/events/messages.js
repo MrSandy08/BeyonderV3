@@ -267,18 +267,14 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               // Log de Calibración
               const userInDB = await User.findOne({ jid: sender, groupId: groupJid }).lean();
               const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
-              console.log('--- CALIBRACIÓN IA --- Probabilidad:', analysis.nsfwScore, 'Usuario:', fullIdentity);
+              console.log('--- CALIBRACIÓN IA --- NSFW:', analysis.nsfwScore, 'GORE:', analysis.goreScore, 'Usuario:', fullIdentity);
 
               const isSticker = msg.type === 'stickerMessage';
-              const nsfwThreshold = isSticker ? 0.80 : 0.85;
-              const goreThreshold = 0.90;
+              const nsfwThreshold = isSticker ? 0.80 : 0.70; // Umbral de NudeNet
+              const goreThreshold = 0.60; // Umbral de CLIP Gore
 
-              const isPorn = (analysis.pornScore || 0) > 0.95;
-              const isHentai = (analysis.hentaiScore || 0) > 0.70;
-              const isSexting = (analysis.sextingScore || 0) > 0.70;
-
-              const detectadoNSFW = (analysis.nsfwScore > nsfwThreshold || isPorn || isHentai || isSexting) && cfg.antinsfw;
-              const detectadoGORE = analysis.goreScore > goreThreshold && cfg.antigore;
+              const detectadoNSFW = (analysis.nsfwScore > nsfwThreshold) && cfg.antinsfw;
+              const detectadoGORE = (analysis.goreScore > goreThreshold) && cfg.antigore;
 
               if (detectadoNSFW || detectadoGORE) {
                 await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});

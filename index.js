@@ -18,65 +18,79 @@ import handleMessages from "./src/events/messages.js";
 // ════════════════════════════════════════════════════════════════════════════
 //  1. CONEXIÓN A WHATSAPP (Baileys)
 // ════════════════════════════════════════════════════════════════════════════
+let mongoClient = null;
+
 const conectarWhatsApp = async (comandos) => {
-
-  console.log("Intentando conectar a DB para sesión...");
-  if (!MONGO_URI) {
-    console.error("❌ ERROR: MONGO_URI no está definido.");
-  } else {
-    console.log(`✅ MONGO_URI detectado: ${MONGO_URI.substring(0, 15)}...`);
-  }
-
-  const client = new MongoClient(MONGO_URI);
-  await client.connect();
-  const db = client.db("BeyonderV3");
-  const collection = db.collection("auth");
-
-  const { state, saveCreds } = await useMongoDBAuthState(collection);
-  const { version }          = await fetchLatestBaileysVersion();
-
-  const sock = makeWASocket({
-    version,
-    auth:                state,
-    logger:              pino({ level: "silent" }),
-    markOnlineOnConnect: false,
-  });
-
-  // ── Guardar credenciales al actualizarse ────────────────────────────────
-  sock.ev.on("creds.update", saveCreds);
-
-  // ── Gestión de la conexión / reconexión ─────────────────────────────────
-  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      console.log("\n📱 Escanea este QR con tu WhatsApp:\n");
-      qrcode.generate(qr, { small: true });
+  try {
+    if (!mongoClient) {
+      console.log("Intentando conectar a DB para sesión...");
+      mongoClient = new MongoClient(MONGO_URI);
+      await mongoClient.connect();
+      console.log("✅ Cliente MongoDB para sesión listo.");
     }
 
-    if (connection === "open") {
-      console.log("✅ WhatsApp conectado correctamente.\n");
-    }
+    const db = mongoClient.db("BeyonderV3");
+    const collection = db.collection("auth");
 
-    if (connection === "close") {
-      const codigo  = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      const reconectar = codigo !== DisconnectReason.loggedOut;
+    const { state, saveCreds } = await useMongoDBAuthState(collection);
+    const { version }          = await fetchLatestBaileysVersion();
 
-      if (reconectar) {
-        console.log("🔄 Reconectando a WhatsApp...");
-        conectarWhatsApp(comandos); // reintento recursivo
-      } else {
-        console.log("🚪 Sesión cerrada. Borra la carpeta auth_info_baileys y reinicia.");
+    const sock = makeWASocket({
+      version,
+      auth:                state,
+      logger:              pino({ level: "silent" }),
+      markOnlineOnConnect: false,
+      printQRInTerminal:   false, // lo manejamos nosotros
+    });
+
+    // ── Guardar credenciales al actualizarse ────────────────────────────────
+    sock.ev.on("creds.update", saveCreds);
+
+    // ── Gestión de la conexión / reconexión ─────────────────────────────────
+    sock.ev.on("connection.update", async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        console.log("\n📱 Escanea este QR con tu WhatsApp:\n");
+        qrcode.generate(qr, { small: true });
       }
-    }
-  });
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  2. ESCUCHADOR DE MENSAJES
-  // ════════════════════════════════════════════════════════════════════════
-  sock.ev.on("messages.upsert", (upsert) =>
-    handleMessages(upsert, sock, comandos)
-  );
+      if (connection === "open") {
+        console.log("✅ WhatsApp conectado correctamente.\n");
+      }
 
-  return sock;
+      if (connection === "close") {
+        const error = lastDisconnect?.error;
+        const codigo = new Boom(error)?.output?.statusCode;
+        const reason = error?.message || "Desconocida";
+        
+        console.log(`❌ Conexión cerrada. Razón: ${reason} | Código: ${codigo}`);
+
+        const debeReconectar = codigo !== DisconnectReason.loggedOut;
+
+        if (debeReconectar) {
+          const delay = 5000;
+          console.log(`🔄 Reconectando en ${delay/1000}s...`);
+          setTimeout(() => conectarWhatsApp(comandos), delay);
+        } else {
+          console.log("🚪 Sesión cerrada permanentemente (Logged Out).");
+          // Opcional: limpiar colección auth si es necesario
+        }
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  2. ESCUCHADOR DE MENSAJES
+    // ════════════════════════════════════════════════════════════════════════
+    sock.ev.on("messages.upsert", (upsert) =>
+      handleMessages(upsert, sock, comandos)
+    );
+
+    return sock;
+  } catch (err) {
+    console.error("❌ Error fatal en conectarWhatsApp:", err.message);
+    setTimeout(() => conectarWhatsApp(comandos), 10000);
+  }
 };
 
 // ════════════════════════════════════════════════════════════════════════════

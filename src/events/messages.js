@@ -32,6 +32,29 @@ const floodTracker = new Map();
 const FLOOD_LIMIT  = 15;
 const FLOOD_WINDOW = 5000; // 5 segundos
 
+// ── Helper: Convertir Cookies JSON a Netscape para yt-dlp ───────────────────────
+const jsonToNetscape = (jsonStr) => {
+  try {
+    const cookies = JSON.parse(jsonStr);
+    if (!Array.isArray(cookies)) return jsonStr;
+    
+    let netscape = "# Netscape HTTP Cookie File\n# http://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file!  Do not edit.\n\n";
+    for (const c of cookies) {
+      const domain = c.domain || "";
+      const flag = domain.startsWith(".") ? "TRUE" : "FALSE";
+      const path = c.path || "/";
+      const secure = c.secure ? "TRUE" : "FALSE";
+      const expiration = c.expirationDate || Math.floor(Date.now() / 1000) + (3600 * 24 * 365);
+      const name = c.name || "";
+      const value = c.value || "";
+      netscape += `${domain}\t${flag}\t${path}\t${secure}\t${Math.floor(expiration)}\t${name}\t${value}\n`;
+    }
+    return netscape;
+  } catch (e) {
+    return jsonStr; // Si no es JSON, devolver tal cual
+  }
+};
+
 setInterval(() => {
   const cutoff = Date.now() - FLOOD_WINDOW;
   for (const [key, times] of floodTracker) {
@@ -102,14 +125,8 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 
     // Agregar cookies si están configuradas
     if (config.YOUTUBE_COOKIES) {
-      try {
-        // Intentar guardar como JSON si es un array válido
-        JSON.parse(config.YOUTUBE_COOKIES);
-        fs.writeFileSync(cookiePath, config.YOUTUBE_COOKIES);
-      } catch (e) {
-        // Si no es JSON, guardar como texto plano (formato Netscape)
-        fs.writeFileSync(cookiePath, config.YOUTUBE_COOKIES);
-      }
+      const netscapeCookies = jsonToNetscape(config.YOUTUBE_COOKIES);
+      fs.writeFileSync(cookiePath, netscapeCookies);
       options.cookies = cookiePath;
     }
 
@@ -129,9 +146,13 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
           if (config.YOUTUBE_COOKIES) {
             try {
               const cookiesArray = JSON.parse(config.YOUTUBE_COOKIES);
-              agent = ytdl.createAgent(Array.isArray(cookiesArray) ? cookiesArray : []);
+              if (Array.isArray(cookiesArray)) {
+                agent = ytdl.createAgent(cookiesArray);
+              } else {
+                console.warn("⚠️ Las cookies no están en formato de Array JSON.");
+              }
             } catch (e) {
-              console.warn("⚠️ Las cookies no están en formato JSON. ytdl-core podría fallar.");
+              console.warn("⚠️ Las cookies no están en formato JSON. ytdl-core no puede usar createAgent.");
             }
           }
 

@@ -4,7 +4,7 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
 } from "@whiskeysockets/baileys";
-import { useMongoDBAuthState } from "mongo-baileys";
+import { useMongoDBAuthState } from "./src/utils/mongoAuthState.js";
 import { MongoClient } from "mongodb";
 import { Boom } from "@hapi/boom";
 import pino from "pino";

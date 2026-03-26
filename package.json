@@ -21,7 +21,6 @@
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",
     "form-data": "^4.0.5",
-    "mongo-baileys": "^1.0.1",
     "mongodb": "^7.1.1",
     "mongoose": "^8.4.1",
     "ollama": "^0.6.3",

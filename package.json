@@ -12,6 +12,7 @@
     "@distube/ytdl-core": "^4.16.12",
     "@gradio/client": "^1.6.0",
     "@hapi/boom": "^10.0.1",
+    "@huggingface/inference": "^4.13.15",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@whiskeysockets/baileys": "^6.7.9",
     "axios": "^1.13.6",

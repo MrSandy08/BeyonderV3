@@ -18,9 +18,13 @@ import sharp from "sharp";
 import PQueue from "p-queue";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+import { getAiResponse, addFatigue } from "../services/iaService.js";
 
 // Configurar ffmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+// ── 0. GESTIÓN DE MEMORIA IA (Historial por chat) ──────────────────────────
+const chatHistories = new Map();
 
 // ── Cola de Procesamiento IA ──────────────────────────────────────────────────
 const iaQueue = new PQueue({ concurrency: 1 }); // Procesar de 1 en 1 para no saturar
@@ -502,7 +506,47 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         }
       }
 
-      // ── 7. Manejo de Comandos ──────────────────────────────────────────
+      // ── 7. Disparador de IA (Si no es comando) ─────────────────────────
+      const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+      const isMentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botId);
+      const isReplyToBot = msg.message?.extendedTextMessage?.contextInfo?.participant === botId;
+      const saysBeyonder = /beyonder|beyond/i.test(texto);
+
+      // Solo disparar si el grupo está marcado como 'Principal'
+      const canTriggerIA = cfg?.esPrincipal;
+
+      if (!isCmd && canTriggerIA && (isMentioned || isReplyToBot || saysBeyonder)) {
+        await sock.sendPresenceUpdate('composing', from).catch(() => {});
+        const history = chatHistories.get(from) || [];
+        const { text: aiText, action } = await getAiResponse(sender, from, userName, texto, history);
+        
+        // Guardar en historial
+        history.push({ role: "user", content: texto });
+        history.push({ role: "assistant", content: aiText });
+        if (history.length > 30) history.splice(0, 2); // Mantener 15 pares (30 mensajes)
+        chatHistories.set(from, history);
+
+        await sock.sendMessage(from, { text: aiText }, { quoted: msg });
+        await sock.sendPresenceUpdate('paused', from).catch(() => {});
+
+        // Ejecutar acción detectada (tackled)
+        if (action === "tackled") {
+          const tackedCmd = comandos.get("tackled");
+          if (tackedCmd) {
+            const context = {
+              msg, sock, sender, from, args: [], command: "tackled", text: "",
+              isGroup, isWAAdmin: isAdmin, isMod: false, isOwner: false, permisos: 0, cfg: cfg || {}, meta, config,
+              mentionedJids: [],
+              reply: (t) => sock.sendMessage(from, { text: t }, { quoted: msg }),
+              react: (e) => sock.sendMessage(from, { react: { text: e, key: msg.key } })
+            };
+            await tackedCmd.run(context);
+          }
+        }
+        continue;
+      }
+
+      // ── 8. Manejo de Comandos ──────────────────────────────────────────
       if (!isCmd) {
         if (await handleSearchSelection(sock, msg, from, sender, texto)) continue;
         continue;
@@ -530,6 +574,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       if (!tienePermiso) {
         await sock.sendMessage(from, { text: motivo }, { quoted: msg });
         continue;
+      }
+
+      // Sumar fatiga por comando
+      if (["mine", "fish", "reporte"].includes(command)) {
+        addFatigue(10);
       }
 
       const contexto = {

@@ -20,6 +20,11 @@ import handleMessages from "./src/events/messages.js";
 // ════════════════════════════════════════════════════════════════════════════
 let mongoClient = null;
 
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execPromise = promisify(exec);
+
 const conectarWhatsApp = async (comandos) => {
   try {
     if (!mongoClient) {
@@ -70,6 +75,22 @@ const conectarWhatsApp = async (comandos) => {
 
       if (connection === "open") {
         console.log("✅ WhatsApp conectado correctamente.\n");
+
+        // ── Notificación de Actualización (Git Commit) ──────────────────────
+        (async () => {
+          try {
+            const { stdout } = await execPromise("git log -1 --pretty=%B");
+            const lastCommit = stdout.trim();
+            const adminJid = config.OWNERS[0]; // Usar el primer owner como admin principal
+            
+            if (adminJid) {
+              await sock.sendMessage(adminJid, { text: `🚀 *Beyonder Actualizado*\n\n📝 *Commit:* ${lastCommit}` });
+              console.log("✅ Notificación de actualización enviada.");
+            }
+          } catch (e) {
+            console.warn("⚠️ No se pudo obtener el log de Git o enviar la notificación.");
+          }
+        })();
       }
 
       if (connection === "close") {

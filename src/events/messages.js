@@ -543,9 +543,36 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         meta,
         config,
         mentionedJids: msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [],
-        reply:  (text, mentions = []) => sock.sendMessage(from, { text, mentions }, { quoted: msg }),
-        send:   (text, mentions = []) => sock.sendMessage(from, { text, mentions }),
-        react:  (emoji)               => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }),
+        reply:  async (text, mentions = []) => {
+          for (let i = 0; i < 3; i++) {
+            try {
+              return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+            } catch (e) {
+              if (i === 2) throw e;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        },
+        send:   async (text, mentions = []) => {
+          for (let i = 0; i < 3; i++) {
+            try {
+              return await sock.sendMessage(from, { text, mentions });
+            } catch (e) {
+              if (i === 2) throw e;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        },
+        react:  async (emoji) => {
+          for (let i = 0; i < 3; i++) {
+            try {
+              return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
+            } catch (e) {
+              if (i === 2) throw e;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        },
       };
 
       await run(contexto);

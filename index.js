@@ -74,7 +74,8 @@ const conectarWhatsApp = async (comandos) => {
 
       if (connection === "close") {
         const error = lastDisconnect?.error;
-        const codigo = new Boom(error)?.output?.statusCode;
+        const boom = new Boom(error);
+        const codigo = boom?.output?.statusCode;
         const reason = error?.message || "Desconocida";
         
         console.log(`❌ Conexión cerrada. Razón: ${reason} | Código: ${codigo}`);
@@ -84,10 +85,13 @@ const conectarWhatsApp = async (comandos) => {
         if (debeReconectar) {
           const delay = 5000;
           console.log(`🔄 Reconectando en ${delay/1000}s...`);
+          // Limpiar client si existe para forzar nueva conexión
+          if (mongoClient && codigo === DisconnectReason.connectionLost) {
+            console.log("⚠️ Conexión perdida, reintentando con nuevo cliente...");
+          }
           setTimeout(() => conectarWhatsApp(comandos), delay);
         } else {
           console.log("🚪 Sesión cerrada permanentemente (Logged Out).");
-          // Opcional: limpiar colección auth si es necesario
         }
       }
     });

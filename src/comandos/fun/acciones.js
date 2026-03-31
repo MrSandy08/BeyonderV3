@@ -67,7 +67,7 @@ async function gifToMp4(buffer) {
 }
 
 export const name      = "hug";
-export const aliases   = ["kiss", "pat", "bite", "slap", "punch", "kick", "kabedon"];
+export const aliases   = ["kiss", "pat", "bite", "slap", "punch", "tackled", "kabedon"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;
@@ -104,7 +104,7 @@ const ACCIONES = {
     "*{yo}* golpea a *{target}* con toda su fuerza. 💥",
     "*{yo}* no aguantó más y le pegó a *{target}*. 😠",
   ]},
-  kick: { emoji: "🦶", endpoint: "kick", textos: [
+  tackled: { emoji: "🦶", endpoint: "kick", textos: [
     "*{yo}* le da una patada a *{target}*. 🦶",
     "*{yo}* patea a *{target}* con fuerza. 💥",
     "*{yo}* mandó a volar a *{target}* de una patada. 💨",

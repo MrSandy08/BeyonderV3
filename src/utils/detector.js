@@ -5,6 +5,9 @@
 import axios from 'axios';
 import FormData from 'form-data';
 
+// ── CONFIGURACIÓN INTERNA (HUGGING FACE) ─────────────────────────────────────
+const AI_SERVER_URL = `http://127.0.0.1:7860/detect`;
+
 // ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
 const NSFW_THRESHOLDS = {
   // EXPOSED_GENITALIA: Muy sensible (0.30 - 0.40)

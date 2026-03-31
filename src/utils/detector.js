@@ -5,8 +5,27 @@
 import axios from 'axios';
 import FormData from 'form-data';
 
-// ── CONFIGURACIÓN INTERNA (HUGGING FACE) ─────────────────────────────────────
-const AI_SERVER_URL = `http://127.0.0.1:7860/detect`;
+// ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
+const NSFW_THRESHOLDS = {
+  // EXPOSED_GENITALIA: Muy sensible (0.30 - 0.40)
+  'FEMALE_GENITALIA_EXPOSED': 0.30,
+  'MALE_GENITALIA_EXPOSED':   0.30,
+  'ANUS_EXPOSED':             0.30,
+  'PHALLUS_EXPOSED':          0.30,
+  'VULVA_EXPOSED':            0.30,
+  'PUBIC_HAIR_EXPOSED':       0.30,
+  
+  // EXPOSED_BREASTS: Sensibilidad media (0.50)
+  'FEMALE_BREAST_EXPOSED':    0.50,
+  'BREAST_EXPOSED':           0.50,
+  
+  // COVERED / OTRAS: Menos sensible (0.80)
+  'COVERED_GENITALIA':        0.80,
+  'COVERED_BREASTS':          0.80,
+  'COVERED_BUTTOCKS':         0.80,
+  'BUTTOCKS_EXPOSED':         0.60,
+  'MALE_BREAST_EXPOSED':      0.80,
+};
 
 /**
  * Analiza una imagen enviándola al servidor FastAPI en Hugging Face.
@@ -18,7 +37,7 @@ export async function analyzeImage(buffer) {
 
     const response = await axios.post(AI_SERVER_URL, form, {
       headers: { ...form.getHeaders() },
-      timeout: 30000 // Aumentado para latencia de red
+      timeout: 30000 
     });
 
     const result = response.data;
@@ -27,41 +46,50 @@ export async function analyzeImage(buffer) {
       return { isNsfw: false, isGore: false, error: result.error };
     }
 
-    // Adaptar respuesta del nuevo servidor (CLIP + NudeNet)
     const nsfwDetections = result.nsfw || [];
     const goreResult = result.gore || { is_gore: false, confidence: 0 };
     
-    // Clasificación básica NSFW basada en etiquetas comunes de NudeNet
-    // NudeNet devuelve una lista de detecciones. Buscamos la de mayor puntuación de desnudez.
-    const labelsNSFW = [
-      'BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 
-      'MALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED', 'MALE_BREAST_EXPOSED',
-      'PHALLUS_EXPOSED', 'BREAST_EXPOSED', 'VULVA_EXPOSED', 'PUBIC_HAIR_EXPOSED'
-    ];
-    
-    // Log para depuración interna (ver qué está viendo la IA)
-    if (nsfwDetections.length > 0) {
-      console.log(`[DEBUG IA] Detecciones NudeNet: ${nsfwDetections.map(d => `${d.class}(${(d.score*100).toFixed(0)}%)`).join(', ')}`);
+    let isNsfw = false;
+    let maxNsfwScore = 0;
+    let detectedClass = null;
+    let immediateDelete = false;
+
+    // Procesar detecciones con umbrales diferenciados
+    for (const det of nsfwDetections) {
+      const { class: className, score } = det;
+      const threshold = NSFW_THRESHOLDS[className] || 0.70;
+
+      // Log de depuración para scores > 0.10
+      if (score > 0.10) {
+        console.log(`[DEBUG IA] Clase: ${className} | Score: ${score.toFixed(4)} | Threshold: ${threshold}`);
+      }
+
+      if (score >= threshold) {
+        isNsfw = true;
+        if (score > maxNsfwScore) {
+          maxNsfwScore = score;
+          detectedClass = className;
+        }
+
+        // Acción inmediata para GENITALIA (si supera 0.30)
+        if (className.includes('GENITALIA') || className.includes('PHALLUS') || className.includes('VULVA') || className.includes('ANUS')) {
+          immediateDelete = true;
+          // No hacemos break aquí para terminar de loguear todo si fuera necesario, 
+          // pero ya marcamos que debe borrarse ya.
+        }
+      }
     }
 
-    // Filtrar solo las etiquetas que consideramos NSFW
-    const nsfwHits = nsfwDetections.filter(d => labelsNSFW.includes(d.class));
-    
-    // Obtener el score más alto de las detecciones NSFW
-    const maxNsfwScore = nsfwHits.length > 0 
-      ? Math.max(...nsfwHits.map(d => d.score)) 
-      : 0;
-
-    // Asegurar que Gore Score sea numérico
     const goreScore = typeof goreResult.confidence === 'number' ? goreResult.confidence : 0;
 
     return {
-      isNsfw: maxNsfwScore > 0.70,
+      isNsfw,
       nsfwScore: maxNsfwScore,
+      detectedClass,
+      immediateDelete,
       isGore: goreResult.is_gore || goreScore > 0.50,
       goreScore: goreScore,
-      isAnime: false,
-      threshold: 0.70
+      isAnime: false
     };
   } catch (error) {
     console.error("Error conectando con Hugging Face Space:", error.message);
@@ -72,7 +100,7 @@ export async function analyzeImage(buffer) {
 // Mantener compatibilidad
 export const detectNsfw = async (buffer) => {
   const res = await analyzeImage(buffer);
-  return { isNsfw: res.isNsfw, confidence: res.nsfwScore };
+  return { isNsfw: res.isNsfw, confidence: res.nsfwScore, detectedClass: res.detectedClass, immediateDelete: res.immediateDelete };
 };
 
 export const detectGore = async (buffer) => {

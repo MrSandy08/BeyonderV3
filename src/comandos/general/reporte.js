@@ -1,51 +1,31 @@
 // src/comandos/general/reporte.js
-// !reporte [texto] | !sugerencia [texto]
-import config from "../../config.js";
+import { aviso } from "../../utils/format.js";
 
 export const name      = "reporte";
-export const aliases   = ["sugerencia", "sugerir", "reportar"];
+export const aliases   = ["reportar"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;
 
-const numFromJid = (jid) => jid?.split("@")[0] || jid;
-
 export const run = async (contexto) => {
-  const { reply, react, sender, args, msg, sock } = contexto;
-
-  const rawBody = (
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text || ""
-  ).trim().toLowerCase();
-
-  const isSugerencia = rawBody.startsWith("!sugerencia") || rawBody.startsWith("!sugerir");
+  const { reply, react, sender, args, sock, from, meta } = contexto;
 
   const texto = args.join(" ").trim();
-  if (!texto) {
-    return reply(
-      isSugerencia
-        ? "❌ Escribe tu sugerencia. Ej: `!sugerencia Me gustaría que...`"
-        : "❌ Escribe tu reporte. Ej: `!reporte Usuario X está haciendo...`"
-    );
-  }
+  if (!texto) return reply(aviso("Escribe tu reporte. Ej: `!reporte Usuario X está haciendo...`"));
 
-  const tipo  = isSugerencia ? "💡 Sugerencia" : "🚨 Reporte";
-  const emoji = isSugerencia ? "💡" : "🚨";
+  // Obtener admins del grupo
+  const participants = meta?.participants || [];
+  const admins = participants.filter(p => p.admin === "admin" || p.admin === "superadmin").map(p => p.id);
+
+  if (!admins.length) return reply(aviso("No hay administradores en este grupo para reportar."));
+
+  const adminMentions = admins.map(jid => `@${jid.split("@")[0]}`).join(" ");
+  
+  await sock.sendMessage(from, {
+    text: `${adminMentions}\n\n🚨 *REPORTE DE USUARIO*\n\nDe: @${sender.split("@")[0]}\nMotivo: "${texto}"`,
+    mentions: [...admins, sender]
+  });
 
   await react("✅");
-  await reply(
-    `  ⤷ ♯ ·  · ${tipo} Recibido.\n\n` +
-    `  _"${texto}"_\n\n` +
-    `  Se ha notificado al staff. Gracias.`
-  );
-
-  const owners = config.OWNERS || [];
-  for (const ownerJid of owners) {
-    await sock.sendMessage(ownerJid, {
-      text:
-        `  ♯ ·  · ${tipo} de @${numFromJid(sender)}\n\n` +
-        `  _"${texto}"_`,
-      mentions: [sender]
-    }).catch(() => {});
-  }
+  await reply(aviso("Reporte enviado a los administradores del grupo."));
 };

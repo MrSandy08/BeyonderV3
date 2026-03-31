@@ -18,17 +18,12 @@ const normNombre   = (n)   => n?.toLowerCase().normalize("NFD").replace(/[\u0300
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const run = async (contexto) => {
-  const { reply, react, sender, args, isMod, isOwner, isWAAdmin, mentionedJids, msg, cfg } = contexto;
-
-  const rawBody = (
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text || ""
-  ).trim().toLowerCase();
+  const { reply, react, sender, args, command, text, isMod, isOwner, isWAAdmin, mentionedJids, msg, cfg } = contexto;
 
   // ══════════════════════════════════════════════
   //  !buscados — público
   // ══════════════════════════════════════════════
-  if (rawBody === "!buscados") {
+  if (command === "buscados") {
     const lista = await Buscados.find({}).lean();
     if (!lista.length) return reply(aviso("No hay personajes pedidos actualmente."));
 
@@ -41,9 +36,9 @@ export const run = async (contexto) => {
   // ══════════════════════════════════════════════
   //  !pedir [nombre] — público
   // ══════════════════════════════════════════════
-  if (rawBody.startsWith("!pedir")) {
+  if (command === "pedir") {
     const { from } = contexto;
-    const nombre = args.slice(0).join(" ").trim();
+    const nombre = text;
     if (!nombre) return reply(aviso("Escribe el nombre del personaje que buscas.\n       𝄄   _Ej: !pedir Itachi Uchiha_"));
 
     const yaOcupado = await User.findOne({ groupId: from, personaje: new RegExp(`^${nombre}$`, "i") }).lean();
@@ -58,10 +53,44 @@ export const run = async (contexto) => {
   }
 
   // ══════════════════════════════════════════════
-  //  !lista — público
+  //  !lista — público con subcomandos
   // ══════════════════════════════════════════════
-  if (rawBody === "!lista") {
+  if (command === "lista") {
     const { from, meta } = contexto;
+    const sub = args[0]?.toLowerCase();
+
+    // Prioridad 1: Subcomando administrativo 'ban'
+    if (sub === "ban") {
+      const baneados = await User.find({ isBanned: true }).lean();
+      if (!baneados.length) return reply(aviso("No hay usuarios baneados en la base de datos."));
+
+      let txt = `🚫 *LISTA DE BANEADOS*\n\n`;
+      baneados.forEach((u, i) => {
+        txt += `${i + 1}. @${u.jid.split("@")[0]}\n`;
+      });
+      return reply(txt, baneados.map(u => u.jid));
+    }
+
+    // Prioridad 2: Búsqueda de personaje si hay argumentos
+    if (args.length > 0) {
+      const query = text;
+      const match = await User.findOne({ 
+        groupId: from, 
+        personaje: new RegExp(`^${query}$`, "i") 
+      }).lean();
+
+      if (!match) return reply(aviso(`No se encontró ningún personaje con el nombre *"${query}"*.`));
+
+      return reply(
+        `👤 *DETALLES DEL PERSONAJE*\n\n` +
+        `   - Nombre: *${match.personaje}*\n` +
+        `   - Usuario: @${match.jid.split("@")[0]}\n` +
+        `   - Mensajes: ${match.msgCount || 0}`,
+        [match.jid]
+      );
+    }
+
+    // Prioridad 3: Lista general (sin argumentos)
     const todos = await User.find({ groupId: from, personaje: { $ne: null } }).lean();
     if (!todos.length) return reply(aviso("No hay personajes registrados todavía en este grupo."));
 
@@ -94,7 +123,7 @@ export const run = async (contexto) => {
   // ══════════════════════════════════════════════
   //  !inactivos — público
   // ══════════════════════════════════════════════
-  if (rawBody === "!inactivos") {
+  if (command === "inactivos") {
     const { from } = contexto;
     const todos     = await User.find({ groupId: from, personaje: { $ne: null } }).lean();
     const inactivos = todos.filter(u => inactividadIcon(u.lastMessage) !== "");
@@ -114,13 +143,13 @@ export const run = async (contexto) => {
   //  !rp quitar [@user] — Mod/Owner para otros,
   //  cualquiera puede quitarse el suyo propio
   // ══════════════════════════════════════════════
-  if (rawBody.startsWith("!rp quitar") || (rawBody.startsWith("!rp") && args[0]?.toLowerCase() === "quitar")) {
+  if (command === "rp" && args[0]?.toLowerCase() === "quitar") {
     const { from } = contexto;
     const puedeOtros = isMod || isOwner;
     
     // Si es !rp quitar @user o !rp quitar Personaje, detectamos el objetivo
     // Quitamos "quitar" de los argumentos para que userTarget no lo confunda con un PJ
-    const argsTarget = args.filter(a => a.toLowerCase() !== "quitar");
+    const argsTarget = args.slice(1);
     const objetivo = puedeOtros ? await userTarget({ ...contexto, args: argsTarget }, User) : sender;
     const esOtro   = objetivo !== sender;
 

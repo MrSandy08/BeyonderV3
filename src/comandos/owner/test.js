@@ -49,11 +49,11 @@ export const run = async (contexto) => {
     } else {
       const status = (result.isNsfw || result.isGore) ? "🚫 BLOQUEABLE" : "✅ SEGURO";
       responseText += `Estado final: *${status}*\n`;
-      responseText += `NSFW: *${(result.nsfwScore * 100).toFixed(1)}%*\n`;
-      responseText += `GORE: *${(result.goreScore * 100).toFixed(1)}%*\n`;
-      responseText += `Estilo: *${result.isAnime ? "Anime" : "Real"}*\n`;
-      responseText += `Umbral: *${result.threshold}*`;
-      await react("✅");
+      responseText += `Clase: *${result.detectedClass || 'N/A'}*\n`;
+      responseText += `NSFW Score: *${(result.nsfwScore * 100).toFixed(1)}%*\n`;
+      responseText += `GORE Score: *${(result.goreScore * 100).toFixed(1)}%*\n`;
+      responseText += `Immediate Delete: *${result.immediateDelete ? 'SÍ' : 'NO'}*\n`;
+      await react((result.isNsfw || result.isGore) ? "🚫" : "✅");
     }
 
     await reply(responseText);

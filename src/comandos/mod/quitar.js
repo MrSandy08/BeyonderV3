@@ -1,6 +1,7 @@
 // src/comandos/mod/quitar.js
 // !quitar nota #N @user | !quitar adv #N @user
 import User from "../../database/models/User.js";
+import Suggestion from "../../database/models/Suggestion.js";
 import { aviso } from "../../utils/format.js";
 import userTarget from "../../utils/userTarget.js";
 
@@ -20,14 +21,15 @@ export const run = async (contexto) => {
     msg.message?.extendedTextMessage?.text || ""
   ).trim().toLowerCase();
 
-  // Determinar qué se quiere quitar: nota o adv
-  const tipo = args[0]?.toLowerCase(); // "nota" o "adv"
-  if (tipo !== "nota" && tipo !== "adv") {
+  // Determinar qué se quiere quitar: nota, adv o suge
+  const tipo = args[0]?.toLowerCase(); // "nota", "adv" o "suge"
+  if (tipo !== "nota" && tipo !== "adv" && tipo !== "suge") {
     return reply(
       aviso(
         "Uso correcto:\n" +
         "       𝄄   _!quitar nota #N @user_ — elimina la nota número N\n" +
-        "       𝄄   _!quitar adv #N @user_ — elimina la advertencia número N"
+        "       𝄄   _!quitar adv #N @user_ — elimina la advertencia número N\n" +
+        "       𝄄   _!quitar suge #N_ — elimina la sugerencia número N"
       )
     );
   }
@@ -36,7 +38,18 @@ export const run = async (contexto) => {
   const numStr = args[1]?.replace("#", "");
   const n      = parseInt(numStr);
   if (isNaN(n) || n < 1) {
-    return reply(aviso(`Indica el número de ${tipo}.\n       𝄄   _Ej: !quitar ${tipo} #2 @usuario_`));
+    return reply(aviso(`Indica el número de ${tipo}.\n       𝄄   _Ej: !quitar ${tipo} #2_`));
+  }
+
+  if (tipo === "suge") {
+    const lista = await Suggestion.find({}).sort({ timestamp: -1 });
+    if (!lista.length) return reply(aviso("No hay sugerencias registradas."));
+    if (n > lista.length) return reply(aviso(`Solo hay *${lista.length}* sugerencia(s). El número máximo es #${lista.length}.`));
+
+    const idToDelete = lista[n - 1]._id;
+    await Suggestion.findByIdAndDelete(idToDelete);
+    await react("✅");
+    return reply(aviso(`Sugerencia *#${n}* eliminada correctamente.`));
   }
 
   // Detectar objetivo (ignorando el tipo y el número)

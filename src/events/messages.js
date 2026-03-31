@@ -370,20 +370,26 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
               console.log('--- CALIBRACIÓN IA --- NSFW:', analysis.nsfwScore, 'GORE:', analysis.goreScore, 'Usuario:', fullIdentity);
 
-              const isSticker = msg.type === 'stickerMessage';
-              const nsfwThreshold = isSticker ? 0.80 : 0.70; // Umbral de NudeNet
-              const goreThreshold = 0.60; // Umbral de CLIP Gore
+              // ── ACCIÓN INMEDIATA (GENITALIA) ──
+              if (analysis.immediateDelete && cfg.antinsfw) {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                console.log(`[IA] Borrado inmediato por GENITALIA detectada (${analysis.detectedClass})`);
+              }
 
-              const detectadoNSFW = (analysis.nsfwScore > nsfwThreshold) && cfg.antinsfw;
+              const goreThreshold = 0.60; // Umbral de CLIP Gore
+              const detectadoNSFW = analysis.isNsfw && cfg.antinsfw;
               const detectadoGORE = (analysis.goreScore > goreThreshold) && cfg.antigore;
 
               if (detectadoNSFW || detectadoGORE) {
-                await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                // Si no se borró antes, borrar ahora
+                if (!analysis.immediateDelete) {
+                  await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
+                  await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                }
 
                 const tipo = detectadoNSFW && detectadoGORE ? "NSFW y GORE" : detectadoNSFW ? "NSFW" : "GORE";
                 const estilo = analysis.isAnime ? "Ilustración/Anime" : "Real";
-                const motivo = `${msg.type === 'stickerMessage' ? 'Sticker' : 'Contenido'} ${tipo} detectado por IA.`;
+                const motivo = `${msg.type === 'stickerMessage' ? 'Sticker' : 'Contenido'} ${tipo} detectado por IA (${analysis.detectedClass || 'Gore'}).`;
                 
                 const actualizado = await User.findOneAndUpdate(
                   { jid: sender, groupId: groupJid },
@@ -502,12 +508,14 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         continue;
       }
 
-      const [rawCmd, ...args] = texto.slice(config.PREFIX.length).trim().split(/\s+/);
-      const nombreCmd = rawCmd.toLowerCase();
+      const body = texto.trim();
+      const command = body.split(/\s+/)[0].toLowerCase().slice(config.PREFIX.length);
+      const args = body.split(/\s+/).slice(1);
+      const text = args.join(" ");
 
-      if (!comandos.has(nombreCmd)) continue;
+      if (!comandos.has(command)) continue;
 
-      const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(nombreCmd);
+      const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
       const dbUser   = await User.findOne({ jid: sender, groupId: groupJid }).select("permisos").lean();
       const permisos = dbUser?.permisos ?? 0;
       const userIsMod = isAdmin && (permisos >= 2 || isOwner);
@@ -525,7 +533,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
       const contexto = {
-        msg, sock, sender, from, args, isGroup,
+        msg, sock, sender, from, args, isGroup, command, text,
         remoteJid: from,
         isWAAdmin:  isAdmin,
         isMod:      userIsMod,

@@ -9,8 +9,8 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     libpango1.0-dev \
     libjpeg-dev \
     libgif-dev \
-    librsvg-dev \
-    libgl1-mesa-glx \
+    librsvg2-dev \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \

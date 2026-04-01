@@ -59,14 +59,15 @@ export const run = async (contexto) => {
     }
   });
 
-  const buffer = await renderBattleScene(playerPoke, combat.enemy, combat.playerHP, combat.enemy.hp_current);
+  const buffer = await renderBattleScene(playerPoke, combat.enemy, combat.playerHP, combat.enemy.hp_current, "main");
 
   let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
   txt += `🌿 EXPLORANDO LA HIERBA ALTA...\n`;
   txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
   txt += `💥 ¡Un *${wildPokeData.name.toUpperCase()}* salvaje ha aparecido! 💥\n\n`;
-  txt += `⚔️ Usa *!atacar* para luchar.\n`;
+  txt += `⚔️ Usa *!luchar* para ver tus ataques.\n`;
   txt += `🔴 Usa *!atrapar* para intentar capturarlo.\n`;
+  txt += `🏃 Usa *!huir* para escapar.`;
 
   return await sock.sendMessage(from, { image: buffer, caption: txt }, { quoted: msg });
 };

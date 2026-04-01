@@ -1,80 +1,41 @@
-// src/comandos/eco/inventory.js
 import User from "../../database/models/User.js";
+import { renderInventoryUI } from "../../services/pokemonService.js";
 
 export const name      = "inventory";
 export const aliases   = ["inventario", "inv"];
-export const onlyAdmin = false;
-export const onlyMod   = false;
-export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, sender, from } = contexto;
+  const { sender, from, sock, msg } = contexto;
 
   const user = await User.findOne({ jid: sender, groupId: from }).lean();
-  if (!user || !user.inventory) {
-    return reply("Inventario vacío.");
-  }
+  if (!user) return;
 
-  const { minerals, fish } = user.inventory;
+  const itemsUI = [];
 
-  // Precios y pesos para cálculo de carga
+  if (user.balls > 0) itemsUI.push({ name: "Pokéballs", qty: user.balls, color: "#e74c3c" });
+  
+  const { minerals, fish } = user.inventory || {};
+  
   const DATA = {
-    stone: { name: "Piedra", weight: 1.2 },
-    coal: { name: "Carbón", weight: 0.8 },
-    copper: { name: "Cobre", weight: 2.5 },
-    iron: { name: "Hierro", weight: 4.0 },
-    ruby_sapphire: { name: "Rubí/Zafiro", weight: 0.5 },
-    diamond: { name: "Diamante", weight: 0.2 },
-    fire_stone: { name: "Piedra Fuego", weight: 0.5 },
-    water_stone: { name: "Piedra Agua", weight: 0.5 },
-    thunder_stone: { name: "Piedra Trueno", weight: 0.5 },
-    common: { name: "Pez Común", weight: 1.5 },
-    puffer: { name: "Pez Globo", weight: 0.8 },
-    salmon: { name: "Salmón", weight: 3.2 },
-    eel: { name: "Anguila", weight: 5.0 },
-    leviathan: { name: "Leviatán", weight: 150.0 },
-    kraken: { name: "Kraken", weight: 300.0 }
+    stone: "Piedra", coal: "Carbón", copper: "Cobre", iron: "Hierro",
+    ruby_sapphire: "Rubí/Zafiro", diamond: "Diamante",
+    fire_stone: "Piedra Fuego", water_stone: "Piedra Agua", thunder_stone: "Piedra Trueno",
+    common: "Pez Común", puffer: "Pez Globo", salmon: "Salmón",
+    eel: "Anguila", leviathan: "Leviatán", kraken: "Kraken"
   };
 
-  let totalWeight = 0;
-  let itemsTxt = "";
-
-  // Mostrar Pokéballs (No pesan en este sistema)
-  if (user.balls > 0) {
-    itemsTxt += `   - Pokéballs (\`x${user.balls}\`) 🔴\n`;
-  }
-
-  // Procesar minerales y piedras
   for (const [key, qty] of Object.entries(minerals || {})) {
-    if (qty > 0) {
-      const item = DATA[key];
-      if (item) {
-        totalWeight += item.weight * qty;
-        itemsTxt += `   - ${item.name} (\`x${qty}\`)\n`;
-      }
-    }
+    if (qty > 0) itemsUI.push({ name: DATA[key] || key, qty });
   }
 
-  // Procesar peces
   for (const [key, qty] of Object.entries(fish || {})) {
-    if (qty > 0) {
-      const item = DATA[key];
-      totalWeight += item.weight * qty;
-      itemsTxt += `   - ${item.name} (\`x${qty}\`)\n`;
-    }
+    if (qty > 0) itemsUI.push({ name: DATA[key] || key, qty, color: "#3498db" });
   }
 
-  let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-  txt += `🎒 TU MOCHILA DE AVENTURERO\n`;
-  txt += `🪙 Oro: ${user.gold || 0}\n`;
-  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  const buffer = await renderInventoryUI("Tu Inventario", user.gold, itemsUI.slice(0, 5)); // Mostrar primeros 5
   
-  txt += `📦 *OBJETOS:*\n`;
-  txt += itemsTxt || "   - (Vacío)\n";
-  
-  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-  txt += `⚖️ Carga: \`${totalWeight.toFixed(1)}kg\` / \`${user.maxWeight || 50}kg\`\n`;
-  txt += `Usa \`!vender [ítem]\` para comerciar.`;
-
-  return reply(txt);
+  return await sock.sendMessage(from, { 
+    image: buffer, 
+    caption: `🎒 *TU INVENTARIO*\n💰 Oro: \`${user.gold}\`` 
+  }, { quoted: msg });
 };

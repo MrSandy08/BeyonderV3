@@ -1,4 +1,3 @@
-// src/database/moves.json
 [
   { "name": "Placaje", "power": 40, "type": "Normal" },
   { "name": "Gruñido", "power": 0, "type": "Normal", "effect": "debuff_atk" },

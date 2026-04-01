@@ -137,7 +137,14 @@ export const run = async (contexto) => {
   await combat.save();
 
   // 5. Renderizar nueva escena
-  const buffer = await renderBattleScene(playerPoke, enemyPoke, pHP, eHP);
+  const buffer = await renderBattleScene(
+    playerPoke, 
+    enemyPoke, 
+    pHP, 
+    eHP, 
+    combat.isActive ? combat.menu : "main", 
+    movesData
+  );
 
   let caption = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
   caption += log;

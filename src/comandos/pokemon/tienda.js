@@ -1,62 +1,54 @@
-// src/comandos/pokemon/tienda.js
 import User from "../../database/models/User.js";
 import { aviso } from "../../utils/format.js";
+import { renderInventoryUI } from "../../services/pokemonService.js";
 
 export const name      = "tienda";
 export const aliases   = ["shop-poke"];
-export const onlyAdmin = false;
-export const onlyMod   = false;
-export const onlyOwner = false;
 
-const PRECIO_BALL = 100;
+const ITEMS = {
+  "1": { name: "Pokéball", price: 100, dbField: "balls", color: "#e74c3c" },
+  "2": { name: "Poción", price: 200, dbField: "potions", color: "#2ecc71" } // Ejemplo extra
+};
 
 export const run = async (contexto) => {
-  const { reply, sender, from, args } = contexto;
+  const { reply, sender, from, args, sock, msg } = contexto;
 
-  const user = await User.findOne({ jid: sender, groupId: from }).lean();
-  
-  if (!user?.started) {
-    return reply(aviso("Debes usar *!comenzar* antes de entrar a la tienda."));
+  const user = await User.findOne({ jid: sender, groupId: from });
+  if (!user?.started) return reply(aviso("Usa *!comenzar* primero."));
+
+  if (args.length === 0 || args[0] === "menu") {
+    const itemsUI = Object.entries(ITEMS).map(([id, item]) => ({
+      name: `${id}. ${item.name}`,
+      price: item.price,
+      qty: user[item.dbField] || 0,
+      color: item.color
+    }));
+
+    const buffer = await renderInventoryUI("Tienda Pokémon", user.gold, itemsUI);
+    return await sock.sendMessage(from, { image: buffer, caption: "🛒 *TIENDA POKÉMON*\nUsa `!tienda comprar [id] [cantidad]` para adquirir objetos." }, { quoted: msg });
   }
 
-  if (args.length === 0) {
-    let txt = `🏪 *TIENDA POKÉMON* 🏪\n`;
-    txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-    txt += `💰 Tu Saldo: \`${user.gold || 0} Oro\` 🪙\n`;
-    txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
-    txt += `🔴 *Pokéball* → \`${PRECIO_BALL} Oro\`\n`;
-    txt += `   _Uso: !tienda comprar [cantidad]_\n\n`;
-    txt += `¡Equípate bien antes de salir a explorar!`;
-    return reply(txt);
+  if (args[0] === "comprar") {
+    const id = args[1];
+    const qty = Math.max(1, parseInt(args[2]) || 1);
+    const item = ITEMS[id];
+
+    if (!item) return reply(aviso("ID de objeto no válido."));
+
+    const totalCost = item.price * qty;
+    if (user.gold < totalCost) return reply(aviso(`Necesitas ${totalCost} de oro.`));
+
+    // Actualización de DB
+    user.gold -= totalCost;
+    user[item.dbField] = (user[item.dbField] || 0) + qty;
+    await user.save();
+
+    const itemsUI = [{ name: item.name, qty: user[item.dbField], color: item.color }];
+    const buffer = await renderInventoryUI("Compra Exitosa", user.gold, itemsUI);
+    
+    return await sock.sendMessage(from, { 
+      image: buffer, 
+      caption: `✅ Compraste x${qty} ${item.name} por ${totalCost} de oro.` 
+    }, { quoted: msg });
   }
-
-  if (args[0].toLowerCase() === "comprar") {
-    const qty = parseInt(args[1]) || 1;
-    if (qty < 1) return reply(aviso("La cantidad debe ser mayor a 0."));
-
-    const totalCost = PRECIO_BALL * qty;
-
-    if ((user.gold || 0) < totalCost) {
-      return reply(aviso(`❌ No tienes suficiente oro. Necesitas \`${totalCost}\` y tienes \`${user.gold || 0}\`.`));
-    }
-
-    await User.findOneAndUpdate(
-      { jid: sender, groupId: from },
-      { 
-        $inc: { gold: -totalCost, balls: qty } 
-      }
-    );
-
-    let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-    txt += `✅ COMPRA REALIZADA\n`;
-    txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-    txt += `📦 Has comprado: \`x${qty} Pokéballs\`\n`;
-    txt += `💰 Oro Gastado: \`-${totalCost}\` 🪙\n`;
-    txt += `🔴 Total en Inventario: \`${(user.balls || 0) + qty} Pokéballs\`\n`;
-    txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
-
-    return reply(txt);
-  }
-
-  return reply(aviso("Uso: *!tienda comprar [cantidad]*"));
 };

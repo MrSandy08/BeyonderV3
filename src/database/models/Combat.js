@@ -36,6 +36,10 @@ const CombatSchema = new Schema(
       type:    String, // "player" | "enemy"
       default: "player",
     },
+    menu: {
+      type:    String, // "main" | "fight"
+      default: "main",
+    },
     isActive: {
       type:    Boolean,
       default: true,

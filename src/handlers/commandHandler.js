@@ -76,32 +76,6 @@ const cargarComandos = async () => {
     }
   }
 
-  // Caso especial: rpgEngine.js si existe en src/rpg/
-  try {
-    const rpgEnginePath = join(__dirname, "..", "rpg", "rpgEngine.js");
-    if (existsSync(rpgEnginePath)) {
-      const rpg = await import(pathToFileURL(rpgEnginePath).href);
-      if (rpg.run) {
-        const nombre = (rpg.name || "rpgEngine").toLowerCase();
-        const entry = { 
-          run: rpg.run, 
-          onlyAdmin: rpg.onlyAdmin || false, 
-          onlyMod: rpg.onlyMod || false, 
-          onlyOwner: rpg.onlyOwner || false,
-          category: "rpg"
-        };
-        comandos.set(nombre, entry);
-        if (rpg.aliases) {
-          rpg.aliases.forEach(a => comandos.set(a.toLowerCase(), entry));
-        }
-        console.log(`   📦 [rpg] !${nombre} (engine) → motor`);
-      }
-    }
-  } catch (err) {
-    // No interrumpir si no se encuentra
-  }
-
-  console.log(`\n✅ ${comandos.size} entrada(s) cargada(s) en el mapa de comandos.\n`);
   return comandos;
 };
 

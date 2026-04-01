@@ -17,21 +17,64 @@ export const run = async (contexto) => {
 
   const { minerals, fish } = user.inventory;
 
-  let txt = `MINERALES:\n`;
-  txt += `Stone: ${minerals?.stone || 0}\n`;
-  txt += `Coal: ${minerals?.coal || 0}\n`;
-  txt += `Copper: ${minerals?.copper || 0}\n`;
-  txt += `Iron: ${minerals?.iron || 0}\n`;
-  txt += `Ruby/Sapphire: ${minerals?.ruby_sapphire || 0}\n`;
-  txt += `Diamond: ${minerals?.diamond || 0}\n\n`;
+  // Precios y pesos para cálculo de carga
+  const DATA = {
+    stone: { name: "Piedra", weight: 1.2 },
+    coal: { name: "Carbón", weight: 0.8 },
+    copper: { name: "Cobre", weight: 2.5 },
+    iron: { name: "Hierro", weight: 4.0 },
+    ruby_sapphire: { name: "Rubí/Zafiro", weight: 0.5 },
+    diamond: { name: "Diamante", weight: 0.2 },
+    fire_stone: { name: "Piedra Fuego", weight: 0.5 },
+    water_stone: { name: "Piedra Agua", weight: 0.5 },
+    thunder_stone: { name: "Piedra Trueno", weight: 0.5 },
+    common: { name: "Pez Común", weight: 1.5 },
+    puffer: { name: "Pez Globo", weight: 0.8 },
+    salmon: { name: "Salmón", weight: 3.2 },
+    eel: { name: "Anguila", weight: 5.0 },
+    leviathan: { name: "Leviatán", weight: 150.0 },
+    kraken: { name: "Kraken", weight: 300.0 }
+  };
 
-  txt += `PECES:\n`;
-  txt += `Common: ${fish?.common || 0}\n`;
-  txt += `Puffer: ${fish?.puffer || 0}\n`;
-  txt += `Salmon: ${fish?.salmon || 0}\n`;
-  txt += `Eel: ${fish?.eel || 0}\n`;
-  txt += `Leviathan: ${fish?.leviathan || 0}\n`;
-  txt += `Kraken: ${fish?.kraken || 0}`;
+  let totalWeight = 0;
+  let itemsTxt = "";
+
+  // Mostrar Pokéballs (No pesan en este sistema)
+  if (user.balls > 0) {
+    itemsTxt += `   - Pokéballs (\`x${user.balls}\`) 🔴\n`;
+  }
+
+  // Procesar minerales y piedras
+  for (const [key, qty] of Object.entries(minerals || {})) {
+    if (qty > 0) {
+      const item = DATA[key];
+      if (item) {
+        totalWeight += item.weight * qty;
+        itemsTxt += `   - ${item.name} (\`x${qty}\`)\n`;
+      }
+    }
+  }
+
+  // Procesar peces
+  for (const [key, qty] of Object.entries(fish || {})) {
+    if (qty > 0) {
+      const item = DATA[key];
+      totalWeight += item.weight * qty;
+      itemsTxt += `   - ${item.name} (\`x${qty}\`)\n`;
+    }
+  }
+
+  let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  txt += `🎒 TU MOCHILA DE AVENTURERO\n`;
+  txt += `🪙 Oro: ${user.gold || 0}\n`;
+  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  
+  txt += `📦 *OBJETOS:*\n`;
+  txt += itemsTxt || "   - (Vacío)\n";
+  
+  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  txt += `⚖️ Carga: \`${totalWeight.toFixed(1)}kg\` / \`${user.maxWeight || 50}kg\`\n`;
+  txt += `Usa \`!vender [ítem]\` para comerciar.`;
 
   return reply(txt);
 };

@@ -104,9 +104,22 @@ const UserSchema = new Schema(
       default: [],
     },
 
+    // ── Pokémon RPG ──────────────────────────────────────────────────────────
+    started: {
+      type:    Boolean,
+      default: false,
+    },
+    balls: {
+      type:    Number,
+      default: 5,
+    },
+
     // ── Economía y Minería ────────────────────────────────────────────────────
     lastMine: { type: Number, default: 0 },
     lastFish: { type: Number, default: 0 },
+    gold:     { type: Number, default: 500 },
+    pickaxeDurability: { type: Number, default: 100 },
+    maxWeight: { type: Number, default: 50 },
     inventory: {
       minerals: {
         stone:         { type: Number, default: 0 },
@@ -115,6 +128,9 @@ const UserSchema = new Schema(
         iron:          { type: Number, default: 0 },
         ruby_sapphire: { type: Number, default: 0 },
         diamond:       { type: Number, default: 0 },
+        fire_stone:    { type: Number, default: 0 },
+        water_stone:   { type: Number, default: 0 },
+        thunder_stone: { type: Number, default: 0 },
       },
       fish: {
         common:    { type: Number, default: 0 },

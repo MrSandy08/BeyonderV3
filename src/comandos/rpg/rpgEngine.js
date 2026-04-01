@@ -7,7 +7,7 @@ import { startAdventure, getScene, resolveChoice, spawnEncounter } from "./servi
 import { renderInventory, renderProfile } from "./services/renderEngine.js";
 import { attackTarget, startDuel } from "./services/combatEngine.js";
 import { loadFonts } from "./utils/fontLoader.js";
-import { aviso } from "../utils/format.js";
+import { aviso } from "../../utils/format.js";
 
 // Inicializar fuentes para Canvas
 loadFonts();

@@ -47,6 +47,20 @@ export const infoHeader = () => {
 export const infoField = (campo, valor) =>
 `\n𝄄➥ ${campo}: ${valor}`;
 
+// ─── Ficha de Pokémon (Con barras de HP y Energía) ──────────────────────────
+export const pokeStats = (poke, data) => {
+  const hpPercent = Math.round((poke.hp_current / poke.hp_max) * 100);
+  const energyPercent = poke.energy || 0;
+  
+  let txt = `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `🐾 *${poke.nickname.toUpperCase()}* (Niv. ${poke.level})\n`;
+  txt += `❤️ HP: ${progressBar(hpPercent, 10)} (\`${poke.hp_current}/${poke.hp_max}\`)\n`;
+  txt += `⚡ Energía: ${progressBar(energyPercent, 10)}\n`;
+  txt += `✨ XP: \`${poke.xp}/100\`\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━━━━━`;
+  return txt;
+};
+
 // ─── Barra de Progreso Visual ────────────────────────────────────────────────
 export const progressBar = (porcentaje, tamano = 10) => {
   const completado = Math.round((tamano * porcentaje) / 100);

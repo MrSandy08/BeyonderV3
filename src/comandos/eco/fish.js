@@ -10,12 +10,12 @@ export const onlyOwner = false;
 const COOLDOWN = 5 * 60 * 1000; // 5 minutos
 
 const WEIGHTS = [
-  { item: "common",    weight: 5000 },
-  { item: "puffer",    weight: 3000 },
-  { item: "salmon",    weight: 1500 },
-  { item: "eel",       weight: 498  },
-  { item: "leviathan", weight: 1    },
-  { item: "kraken",    weight: 1    },
+  { item: "common",    weight: 5000, price: 10,  rarity: "⭐ (Común)",  fish_weight: 1.5 },
+  { item: "puffer",    weight: 3000, price: 30,  rarity: "⭐ (Común)",  fish_weight: 0.8 },
+  { item: "salmon",    weight: 1500, price: 75,  rarity: "⭐⭐ (Raro)", fish_weight: 3.2 },
+  { item: "eel",       weight: 498,  price: 200, rarity: "✨ (Épico)",   fish_weight: 5.0 },
+  { item: "leviathan", weight: 1,    price: 5000,rarity: "💎 (Leyenda)", fish_weight: 150.0 },
+  { item: "kraken",    weight: 1,    price: 8000,rarity: "🐙 (Mítico)",  fish_weight: 300.0 },
 ];
 
 export const run = async (contexto) => {
@@ -29,32 +29,68 @@ export const run = async (contexto) => {
     return reply(`⏳ Debes esperar ${remaining} segundos para volver a pescar.`);
   }
 
-  // Sistema de pesos (1 a 10,000)
-  const random = Math.floor(Math.random() * 10000) + 1;
-  let accumulated = 0;
-  let obtained = "common";
-
-  for (const w of WEIGHTS) {
-    accumulated += w.weight;
-    if (random <= accumulated) {
-      obtained = w.item;
-      break;
+  const randomFish = Math.random();
+  
+  // 60% de probabilidad de encuentro Pokémon
+  if (randomFish < 0.60) {
+    // Generar un ID aleatorio de un Pokémon tipo agua (usando IDs conocidos o filtrando)
+    // Para simplificar, elegiremos un ID aleatorio entre 1 y 151 y verificaremos si es agua
+    const { getPokemonData, renderPokemonCard } = await import("../../services/pokemonService.js");
+    
+    let wildPokeData = null;
+    let attempts = 0;
+    while (!wildPokeData && attempts < 20) {
+      const randomId = Math.floor(Math.random() * 151) + 1;
+      const data = await getPokemonData(randomId);
+      if (data && data.types.includes("water")) {
+        wildPokeData = data;
+      }
+      attempts++;
     }
+
+    if (!wildPokeData) wildPokeData = await getPokemonData(129); // Magikarp por defecto
+
+    await User.findOneAndUpdate({ jid: sender, groupId: from }, { $set: { lastFish: now } });
+
+    // Guardar encuentro en el store para !atrapar
+    const { encounters } = await import("../../store/encounters.js");
+    encounters.set(from + sender, {
+      pokemon: wildPokeData,
+      timestamp: Date.now()
+    });
+
+    const buffer = await renderPokemonCard(wildPokeData);
+
+    let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+    txt += `🎣 ¡ALGO PICA EN EL ANZUELO!\n`;
+    txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+    txt += `🌊 ¡Un *${wildPokeData.name.toUpperCase()}* salvaje ha aparecido!\n`;
+    txt += `💥 *COMBATE DE TEXTO* 💥\n\n`;
+    txt += `¡El ${wildPokeData.name} salta del agua y te desafía!\n`;
+    txt += `🔴 Usa *!atrapar* para intentar capturarlo.\n`;
+    
+    return await contexto.sock.sendMessage(from, { image: buffer, caption: txt }, { quoted: contexto.msg });
   }
 
+  // 40% encontrar basura/objetos
+  const goldGain = Math.floor(Math.random() * 50) + 10;
+  
   // Actualización atómica
   await User.findOneAndUpdate(
     { jid: sender, groupId: from },
     { 
-      $inc: { [`inventory.fish.${obtained}`]: 1 },
+      $inc: { gold: goldGain },
       $set: { lastFish: now }
     },
     { upsert: true }
   );
 
-  const emoji = {
-    common: "🐟", puffer: "🐡", salmon: "🍣", eel: "🐍", leviathan: "🌊", kraken: "🦑"
-  }[obtained];
+  let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  txt += `🎣 ¡ALGO PICA EN EL ANZUELO!\n`;
+  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+  txt += `👞 Solo has pescado... ¡Basura!\n`;
+  txt += `💰 Pero la vendes por \`${goldGain} Oro\`. 🪙\n`;
+  txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
 
-  await reply(`🎣 Has pescado: *${obtained}* ${emoji}`);
+  await reply(txt);
 };

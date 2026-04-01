@@ -11,9 +11,11 @@ import pino from "pino";
 import qrcode from "qrcode-terminal";
 
 import connectDB      from "./src/database/connection.js";
-import { MONGO_URI, PORT, PHONE_NUMBER } from "./src/config.js";
+import config         from "./src/config.js";
 import cargarComandos from "./src/handlers/commandHandler.js";
 import handleMessages from "./src/events/messages.js";
+
+const { MONGO_URI, PORT, PHONE_NUMBER, OWNERS } = config;
 
 // ════════════════════════════════════════════════════════════════════════════
 //  1. CONEXIÓN A WHATSAPP (Baileys)
@@ -83,7 +85,7 @@ const conectarWhatsApp = async (comandos) => {
             const { stdout } = await execPromise("git log -1 --pretty=%B").catch(() => ({ stdout: "Reinicio de sistema / Actualización manual" }));
             
             const lastCommit = stdout.trim() || "Actualización sin mensaje de commit.";
-            const adminJid = config.OWNERS[0]; 
+            const adminJid = OWNERS[0]; 
             
             if (adminJid) {
               // Limpiamos saltos de línea para que el mensaje de WhatsApp sea fluido

@@ -5,8 +5,8 @@ import { HF_TOKEN } from "../config.js";
 
 const hf = new HfInference(HF_TOKEN);
 
-// Modelo sugerido: Uncensored / Roleplay
-const MODEL = "cognitivecomputations/dolphin-2.9.4-llama-3-8b";
+// Modelo sugerido: Uncensored / Roleplay (o uno estable como Zephyr)
+const MODEL = "HuggingFaceH4/zephyr-7b-beta";
 
 // Variable global de fatiga
 let globalFatigue = 0;

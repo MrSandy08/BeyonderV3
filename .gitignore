@@ -1,10 +1,6 @@
 node_modules
 auth_info_baileys
 .env
-*.jpg
-*.png
 .venv
 tmp/
-*.mp4
-*.mp3
 auth_info

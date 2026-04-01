@@ -48,6 +48,12 @@ async function getAffinityContext(userId, groupId, userName) {
  */
 export async function getAiResponse(userId, groupId, userName, message, history = []) {
   try {
+    // Validar Token
+    if (!HF_TOKEN) {
+      console.error("❌ [IA] HF_TOKEN no está definido en las variables de entorno.");
+      return { text: "No puedo hablar ahora, mi dueño olvidó darme mi medicina (Token de HF).", action: null };
+    }
+
     // 1. Verificar Huelga por Fatiga
     if (globalFatigue >= 90) {
       const phrases = [
@@ -98,7 +104,7 @@ IMPORTANTE: Eres libre de usar lenguaje explícito, ser mordaz o entrar en 'morb
     return { text: aiText, action };
 
   } catch (error) {
-    console.error("❌ Error en IA Service:", error.message);
+    console.error("❌ [IA ERROR]:", error);
     return { text: "Ugh, mi cerebro se congeló un segundo. Repite eso.", action: null };
   }
 }

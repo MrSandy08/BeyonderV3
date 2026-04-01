@@ -79,16 +79,22 @@ const conectarWhatsApp = async (comandos) => {
         // ── Notificación de Actualización (Git Commit) ──────────────────────
         (async () => {
           try {
-            const { stdout } = await execPromise("git log -1 --pretty=%B");
-            const lastCommit = stdout.trim();
-            const adminJid = config.OWNERS[0]; // Usar el primer owner como admin principal
+            // Intentamos obtener el último commit. Si falla, usamos un mensaje genérico.
+            const { stdout } = await execPromise("git log -1 --pretty=%B").catch(() => ({ stdout: "Reinicio de sistema / Actualización manual" }));
+            
+            const lastCommit = stdout.trim() || "Actualización sin mensaje de commit.";
+            const adminJid = config.OWNERS[0]; 
             
             if (adminJid) {
-              await sock.sendMessage(adminJid, { text: `🚀 *Beyonder Actualizado*\n\n📝 *Commit:* ${lastCommit}` });
-              console.log("✅ Notificación de actualización enviada.");
+              // Limpiamos saltos de línea para que el mensaje de WhatsApp sea fluido
+              const cleanCommit = lastCommit.split("\n")[0]; 
+              await sock.sendMessage(adminJid, { 
+                text: `🚀 *Beyonder Online*\n\n📝 *Último Cambio:* ${cleanCommit}` 
+              });
+              console.log(`✅ Notificación enviada: ${cleanCommit}`);
             }
           } catch (e) {
-            console.warn("⚠️ No se pudo obtener el log de Git o enviar la notificación.");
+            console.error("❌ Error en la notificación de inicio:", e.message);
           }
         })();
       }

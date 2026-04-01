@@ -55,26 +55,111 @@ export const getPokemonData = async (idOrName) => {
 
 /**
  * Descarga y guarda el sprite en caché si no existe
+ * @param {number} id - ID del Pokémon
+ * @param {string} type - "front" o "back"
  */
-export const getPokemonSprite = async (id) => {
-  const filePath = join(CACHE_DIR, `${id}.png`);
+export const getPokemonSprite = async (id, type = "front") => {
+  const fileName = `${id}_${type}.png`;
+  const filePath = join(CACHE_DIR, fileName);
   
   try {
-    // Verificar si ya existe en caché
     await fs.access(filePath);
     return filePath;
   } catch {
-    // Si no existe, descargar
-    const url = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    const url = type === "back" 
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`
+      : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    
     try {
       const response = await axios.get(url, { responseType: "arraybuffer" });
       await fs.writeFile(filePath, Buffer.from(response.data));
       return filePath;
     } catch (err) {
-      console.error(`Error descargando sprite de Pokémon ${id}:`, err.message);
+      console.error(`Error descargando sprite ${type} de Pokémon ${id}:`, err.message);
       return null;
     }
   }
+};
+
+/**
+ * Genera una escena de batalla estilo GBA
+ */
+export const renderBattleScene = async (playerPoke, enemyPoke, playerHP, enemyHP) => {
+  const canvas = createCanvas(480, 320);
+  const ctx = canvas.getContext("2d");
+
+  // 1. Fondo (Verde simple si no hay assets, o gradiente)
+  const grad = ctx.createLinearGradient(0, 0, 0, 320);
+  grad.addColorStop(0, "#87CEEB"); // Cielo
+  grad.addColorStop(0.6, "#90EE90"); // Suelo
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 480, 320);
+
+  // Plataformas (Elipses)
+  ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+  // Enemigo (arriba derecha)
+  ctx.beginPath();
+  ctx.ellipse(350, 100, 80, 30, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Jugador (abajo izquierda)
+  ctx.beginPath();
+  ctx.ellipse(120, 240, 100, 40, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Sprites
+  const enemySprite = await getPokemonSprite(enemyPoke.pokeID, "front");
+  const playerSprite = await getPokemonSprite(playerPoke.pokeID, "back");
+
+  if (enemySprite) {
+    const img = await loadImage(enemySprite);
+    ctx.drawImage(img, 300, 20, 100, 100);
+  }
+  if (playerSprite) {
+    const img = await loadImage(playerSprite);
+    ctx.drawImage(img, 50, 120, 160, 160);
+  }
+
+  // 3. Interfaz de HP
+  const drawHPBar = (x, y, name, level, current, max, isPlayer) => {
+    // Caja de info
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, 180, 60);
+    ctx.strokeRect(x, y, 180, 60);
+
+    // Texto
+    ctx.fillStyle = "black";
+    ctx.font = "bold 16px sans-serif"; // Usar sans-serif si no hay fuente pixel registrada
+    ctx.fillText(`${name.toUpperCase()}`, x + 10, y + 25);
+    ctx.fillText(`Lv${level}`, x + 130, y + 25);
+
+    // Barra de HP (Fondo)
+    ctx.fillStyle = "#444";
+    ctx.fillRect(x + 10, y + 35, 160, 12);
+
+    // Barra de HP (Vida)
+    const percent = Math.max(0, current / max);
+    let color = "#4fc337"; // Verde
+    if (percent < 0.2) color = "#ff4d4d"; // Rojo
+    else if (percent < 0.5) color = "#ffd633"; // Amarillo
+
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 10, y + 35, 160 * percent, 12);
+    
+    // Texto de vida (solo jugador)
+    if (isPlayer) {
+      ctx.fillStyle = "black";
+      ctx.font = "12px sans-serif";
+      ctx.fillText(`${current}/${max}`, x + 120, y + 55);
+    }
+  };
+
+  // Dibujar barras (Enemigo arriba izquierda, Jugador abajo derecha)
+  drawHPBar(20, 20, enemyPoke.name, enemyPoke.level, enemyHP, enemyPoke.hp_max, false);
+  drawHPBar(280, 230, playerPoke.nickname, playerPoke.level, playerHP, playerPoke.hp_max, true);
+
+  return canvas.toBuffer("image/png");
 };
 
 /**

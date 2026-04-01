@@ -52,14 +52,32 @@ export const run = async (contexto) => {
 
     await User.findOneAndUpdate({ jid: sender, groupId: from }, { $set: { lastFish: now } });
 
-    // Guardar encuentro en el store para !atrapar
-    const { encounters } = await import("../../store/encounters.js");
-    encounters.set(from + sender, {
-      pokemon: wildPokeData,
-      timestamp: Date.now()
+    // Obtener el Pokémon principal del usuario
+    const UserPokemon = (await import("../../database/models/UserPokemon.js")).default;
+    let playerPoke = await UserPokemon.findOne({ owner: sender, groupId: from, isFavorite: true });
+    if (!playerPoke) playerPoke = await UserPokemon.findOne({ owner: sender, groupId: from });
+
+    // Crear combate en MongoDB
+    const Combat = (await import("../../database/models/Combat.js")).default;
+    const combat = await Combat.create({
+      jid:             sender,
+      groupId:         from,
+      playerPokemonId: playerPoke._id,
+      playerHP:        playerPoke.hp_current,
+      enemy: {
+        pokeID:     wildPokeData.id,
+        name:       wildPokeData.name,
+        level:      Math.floor(Math.random() * 5) + 5,
+        hp_current: wildPokeData.stats.hp,
+        hp_max:     wildPokeData.stats.hp,
+        atk:        wildPokeData.stats.atk,
+        def:        wildPokeData.stats.def,
+        spd:        wildPokeData.stats.spd,
+        types:      wildPokeData.types,
+      }
     });
 
-    const buffer = await renderPokemonCard(wildPokeData);
+    const buffer = await renderBattleScene(playerPoke, combat.enemy, combat.playerHP, combat.enemy.hp_current);
 
     let txt = `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
     txt += `🎣 ¡ALGO PICA EN EL ANZUELO!\n`;
@@ -67,6 +85,7 @@ export const run = async (contexto) => {
     txt += `🌊 ¡Un *${wildPokeData.name.toUpperCase()}* salvaje ha aparecido!\n`;
     txt += `💥 *COMBATE DE TEXTO* 💥\n\n`;
     txt += `¡El ${wildPokeData.name} salta del agua y te desafía!\n`;
+    txt += `⚔️ Usa *!atacar* para luchar.\n`;
     txt += `🔴 Usa *!atrapar* para intentar capturarlo.\n`;
     
     return await contexto.sock.sendMessage(from, { image: buffer, caption: txt }, { quoted: contexto.msg });

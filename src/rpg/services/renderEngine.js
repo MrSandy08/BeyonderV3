@@ -1,6 +1,17 @@
 // src/rpg/services/renderEngine.js
 import { createCanvas, loadImage } from "canvas";
 import { join } from "path";
+import { existsSync } from "fs";
+
+/**
+ * Verifica si una imagen existe antes de cargarla.
+ */
+const safeLoadImage = async (path) => {
+  if (!existsSync(path)) {
+    throw new Error(`Archivo no encontrado: ${path.split(/[\\/]/).pop()}`);
+  }
+  return await loadImage(path);
+};
 
 /**
  * Renderiza la mochila (inventario visual) del jugador.
@@ -13,7 +24,7 @@ export const renderInventory = async (player) => {
 
   // 1. Cargar imagen base obligatoria
   const baseImgPath = join(process.cwd(), "assets", "mochila_base.png");
-  const baseImg = await loadImage(baseImgPath);
+  const baseImg = await safeLoadImage(baseImgPath);
   ctx.drawImage(baseImg, 0, 0, 800, 600);
 
   // Configuración de texto
@@ -63,7 +74,7 @@ export const renderProfile = async (player) => {
   const ctx = canvas.getContext("2d");
 
   const baseImgPath = join(process.cwd(), "assets", "profile_base.png");
-  const baseImg = await loadImage(baseImgPath);
+  const baseImg = await safeLoadImage(baseImgPath);
   ctx.drawImage(baseImg, 0, 0, 600, 400);
 
   ctx.fillStyle = "#FFD700";

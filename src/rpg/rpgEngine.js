@@ -94,7 +94,11 @@ export const run = async (contexto) => {
         return reply(aviso(`El comando *!${command}* está en fase de desarrollo Alpha.`));
     }
   } catch (err) {
-    console.error("❌ Error en RPG Engine:", err.message);
-    return reply(aviso("💥 Ocurrió un error crítico en el sistema RPG."));
+    console.error("❌ Error en RPG Engine:", err);
+    const isAdmin = contexto.isOwner || contexto.isMod;
+    const msgError = isAdmin 
+      ? `💥 *ERROR CRÍTICO RPG:* ${err.message}\n\n_Asegúrate de que la carpeta /assets/ tenga las imágenes y fuentes necesarias._`
+      : "💥 Ocurrió un error crítico en el sistema RPG. Notifica a un administrador.";
+    return reply(aviso(msgError));
   }
 };

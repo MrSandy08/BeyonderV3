@@ -48,6 +48,14 @@ const UserPokemonSchema = new Schema(
       type:    Number,
       default: 10,
     },
+    nature: {
+      type:    String,
+      default: "Fuerte",
+    },
+    moves: {
+      type:    [String],
+      default: ["Placaje", "Gruñido"],
+    },
     energy: {
       type:    Number,
       default: 100,

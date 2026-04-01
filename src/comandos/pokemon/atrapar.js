@@ -3,6 +3,7 @@ import User from "../../database/models/User.js";
 import UserPokemon from "../../database/models/UserPokemon.js";
 import Combat      from "../../database/models/Combat.js";
 import { aviso }   from "../../utils/format.js";
+import { getRandomNature, applyNature } from "../../utils/pokemon.js";
 
 export const name      = "atrapar";
 export const aliases   = ["catch"];
@@ -32,7 +33,7 @@ export const run = async (contexto) => {
     { $inc: { balls: -1 } }
   );
 
-  await react("🔴");
+  await react("💫");
 
   // Probabilidad de captura (Aumenta si el HP es bajo)
   // Base 30% + hasta 40% adicional si la vida es 0
@@ -42,16 +43,23 @@ export const run = async (contexto) => {
   const success = Math.random() < catchRate;
 
   if (success) {
+    // Asignar naturaleza y aplicar modificadores
+    const nature = getRandomNature();
+    const baseStats = { hp: wildPoke.hp_max, atk: wildPoke.atk, def: wildPoke.def, spd: wildPoke.spd };
+    const modifiedStats = applyNature(baseStats, nature);
+
     await UserPokemon.create({
       owner:      sender,
       groupId:    from,
       pokeID:     wildPoke.pokeID,
       nickname:   wildPoke.name,
-      hp_current: wildPoke.hp_max, // Se cura al atraparlo
-      hp_max:     wildPoke.hp_max,
-      atk:        wildPoke.atk,
-      def:        wildPoke.def,
-      spd:        wildPoke.spd,
+      hp_current: modifiedStats.hp, // Se cura al atraparlo
+      hp_max:     modifiedStats.hp,
+      atk:        modifiedStats.atk,
+      def:        modifiedStats.def,
+      spd:        modifiedStats.spd,
+      nature:     nature.name,
+      moves:      ["Placaje", "Gruñido"], // Moveset básico
       level:      wildPoke.level,
       xp:         0,
     });
@@ -63,6 +71,7 @@ export const run = async (contexto) => {
     txt += `🌟 ¡HAS ATRAPADO A *${wildPoke.name.toUpperCase()}*! 🌟\n`;
     txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
     txt += `📦 ¡El Pokémon se ha unido a tu equipo! 🎉\n`;
+    txt += `🌿 Naturaleza: *${nature.name}*\n`;
     txt += `🔴 Te quedan: \`${(user.balls || 1) - 1} Pokéballs\`\n`;
     txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
     

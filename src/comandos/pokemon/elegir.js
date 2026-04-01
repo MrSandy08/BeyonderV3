@@ -3,6 +3,7 @@ import User from "../../database/models/User.js";
 import UserPokemon from "../../database/models/UserPokemon.js";
 import { aviso } from "../../utils/format.js";
 import { getPokemonData, renderPokemonCard } from "../../services/pokemonService.js";
+import { getRandomNature, applyNature } from "../../utils/pokemon.js";
 
 export const name      = "elegir";
 export const aliases   = ["choose"];
@@ -38,17 +39,23 @@ export const run = async (contexto) => {
     return reply(aviso("Error al obtener los datos del Pokémon. Inténtalo de nuevo."));
   }
 
+  // Asignar naturaleza y aplicar modificadores
+  const nature = getRandomNature();
+  const modifiedStats = applyNature(pokeData.stats, nature);
+
   // Crear el primer Pokémon con stats de la API
   await UserPokemon.create({
     owner:      sender,
     groupId:    from,
     pokeID:     pokeData.id,
     nickname:   elegido,
-    hp_current: pokeData.stats.hp,
-    hp_max:     pokeData.stats.hp,
-    atk:        pokeData.stats.atk,
-    def:        pokeData.stats.def,
-    spd:        pokeData.stats.spd,
+    hp_current: modifiedStats.hp,
+    hp_max:     modifiedStats.hp,
+    atk:        modifiedStats.atk,
+    def:        modifiedStats.def,
+    spd:        modifiedStats.spd,
+    nature:     nature.name,
+    moves:      ["Placaje", "Gruñido"], // Moveset inicial básico
     level:      5,
     xp:         0,
     isFavorite: true,
@@ -64,7 +71,8 @@ export const run = async (contexto) => {
   const buffer = await renderPokemonCard(pokeData);
 
   let txt = `✨ ¡FELICIDADES, ENTRENADOR! ✨\n\n`;
-  txt += `Has elegido a *${elegido}* como tu primer compañero. 🎉\n\n`;
+  txt += `Has elegido a *${elegido}* como tu primer compañero. 🎉\n`;
+  txt += `🌿 Naturaleza: *${nature.name}*\n\n`;
   txt += `¡Es hora de explorar, minar y pescar para fortalecer tu equipo!\n\n`;
   txt += `Usa *!explorar* para buscar Pokémon salvajes o *!minar* para ganar oro.`;
 

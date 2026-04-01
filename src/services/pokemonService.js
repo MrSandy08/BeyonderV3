@@ -121,43 +121,49 @@ export const renderBattleScene = async (playerPoke, enemyPoke, playerHP, enemyHP
 
   // 3. Interfaz de HP
   const drawHPBar = (x, y, name, level, current, max, isPlayer) => {
-    // Caja de info
-    ctx.fillStyle = "white";
+    // Caja de info (fondo semitransparente para que se vea el fondo)
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
     ctx.strokeStyle = "black";
     ctx.lineWidth = 2;
-    ctx.fillRect(x, y, 180, 60);
-    ctx.strokeRect(x, y, 180, 60);
+    ctx.fillRect(x, y, 180, 65);
+    ctx.strokeRect(x, y, 180, 65);
 
-    // Texto
+    // Texto Nombre y Nivel
     ctx.fillStyle = "black";
-    ctx.font = "bold 16px sans-serif"; // Usar sans-serif si no hay fuente pixel registrada
-    ctx.fillText(`${name.toUpperCase()}`, x + 10, y + 25);
-    ctx.fillText(`Lv${level}`, x + 130, y + 25);
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText(`${name.toUpperCase()}`, x + 10, y + 20);
+    ctx.font = "12px sans-serif";
+    ctx.fillText(`Lv${level}`, x + 130, y + 20);
 
     // Barra de HP (Fondo)
     ctx.fillStyle = "#444";
-    ctx.fillRect(x + 10, y + 35, 160, 12);
+    ctx.fillRect(x + 10, y + 30, 160, 10);
 
     // Barra de HP (Vida)
-    const percent = Math.max(0, current / max);
-    let color = "#4fc337"; // Verde
-    if (percent < 0.2) color = "#ff4d4d"; // Rojo
-    else if (percent < 0.5) color = "#ffd633"; // Amarillo
+    const percent = Math.max(0, Math.min(1, current / max));
+    let color = "#4fc337"; // Verde (>50%)
+    if (percent < 0.2) color = "#ff4d4d"; // Rojo (<20%)
+    else if (percent < 0.5) color = "#ffd633"; // Amarillo (20-50%)
 
     ctx.fillStyle = color;
-    ctx.fillRect(x + 10, y + 35, 160 * percent, 12);
+    ctx.fillRect(x + 10, y + 30, 160 * percent, 10);
     
-    // Texto de vida (solo jugador)
-    if (isPlayer) {
-      ctx.fillStyle = "black";
-      ctx.font = "12px sans-serif";
-      ctx.fillText(`${current}/${max}`, x + 120, y + 55);
-    }
+    // HP numérico (ej: 29/32)
+    ctx.fillStyle = "black";
+    ctx.font = "bold 11px sans-serif";
+    const hpText = `${current}/${max}`;
+    // Alinear a la derecha de la barra
+    ctx.fillText(hpText, x + 170 - ctx.measureText(hpText).width, y + 55);
+    
+    // Texto "HP" al lado de la barra
+    ctx.fillStyle = "#ffcc00";
+    ctx.font = "italic bold 10px sans-serif";
+    ctx.fillText("HP", x + 10, y + 55);
   };
 
   // Dibujar barras (Enemigo arriba izquierda, Jugador abajo derecha)
   drawHPBar(20, 20, enemyPoke.name, enemyPoke.level, enemyHP, enemyPoke.hp_max, false);
-  drawHPBar(280, 230, playerPoke.nickname, playerPoke.level, playerHP, playerPoke.hp_max, true);
+  drawHPBar(280, 220, playerPoke.nickname, playerPoke.level, playerHP, playerPoke.hp_max, true);
 
   return canvas.toBuffer("image/png");
 };

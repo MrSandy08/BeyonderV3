@@ -1,0 +1,9 @@
+// src/database/moves.json
+[
+  { "name": "Placaje", "power": 40, "type": "Normal" },
+  { "name": "Gruñido", "power": 0, "type": "Normal", "effect": "debuff_atk" },
+  { "name": "Látigo Cepa", "power": 45, "type": "Planta" },
+  { "name": "Ascuas", "power": 40, "type": "Fuego" },
+  { "name": "Burbuja", "power": 40, "type": "Agua" },
+  { "name": "Impactrueno", "power": 40, "type": "Eléctrico" }
+]

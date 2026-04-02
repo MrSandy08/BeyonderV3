@@ -77,28 +77,6 @@ const conectarWhatsApp = async (comandos) => {
 
       if (connection === "open") {
         console.log("✅ WhatsApp conectado correctamente.\n");
-
-        // ── Notificación de Actualización (Git Commit) ──────────────────────
-        (async () => {
-          try {
-            // Intentamos obtener el último commit. Si falla, usamos un mensaje genérico.
-            const { stdout } = await execPromise("git log -1 --pretty=%B").catch(() => ({ stdout: "Reinicio de sistema / Actualización manual" }));
-            
-            const lastCommit = stdout.trim() || "Actualización sin mensaje de commit.";
-            const adminJid = OWNERS[0]; 
-            
-            if (adminJid) {
-              // Limpiamos saltos de línea para que el mensaje de WhatsApp sea fluido
-              const cleanCommit = lastCommit.split("\n")[0]; 
-              await sock.sendMessage(adminJid, { 
-                text: `🚀 *Beyonder Online*\n\n📝 *Último Cambio:* ${cleanCommit}` 
-              });
-              console.log(`✅ Notificación enviada: ${cleanCommit}`);
-            }
-          } catch (e) {
-            console.error("❌ Error en la notificación de inicio:", e.message);
-          }
-        })();
       }
 
       if (connection === "close") {

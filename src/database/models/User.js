@@ -103,44 +103,6 @@ const UserSchema = new Schema(
       type:    [AiMessageSchema],
       default: [],
     },
-
-    // ── Pokémon RPG ──────────────────────────────────────────────────────────
-    started: {
-      type:    Boolean,
-      default: false,
-    },
-    balls: {
-      type:    Number,
-      default: 5,
-    },
-
-    // ── Economía y Minería ────────────────────────────────────────────────────
-    lastMine: { type: Number, default: 0 },
-    lastFish: { type: Number, default: 0 },
-    gold:     { type: Number, default: 500 },
-    pickaxeDurability: { type: Number, default: 100 },
-    maxWeight: { type: Number, default: 50 },
-    inventory: {
-      minerals: {
-        stone:         { type: Number, default: 0 },
-        coal:          { type: Number, default: 0 },
-        copper:        { type: Number, default: 0 },
-        iron:          { type: Number, default: 0 },
-        ruby_sapphire: { type: Number, default: 0 },
-        diamond:       { type: Number, default: 0 },
-        fire_stone:    { type: Number, default: 0 },
-        water_stone:   { type: Number, default: 0 },
-        thunder_stone: { type: Number, default: 0 },
-      },
-      fish: {
-        common:    { type: Number, default: 0 },
-        puffer:    { type: Number, default: 0 },
-        salmon:    { type: Number, default: 0 },
-        eel:       { type: Number, default: 0 },
-        leviathan: { type: Number, default: 0 },
-        kraken:    { type: Number, default: 0 },
-      },
-    },
   },
   {
     timestamps: true, // agrega createdAt y updatedAt automáticamente

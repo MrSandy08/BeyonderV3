@@ -117,11 +117,14 @@ export const downloadYouTube = async (url, type = "audio") => {
         "sec-ch-ua-platform: \"Windows\"",
         "Referer: https://www.youtube.com/"
       ],
-      // Limpiar caché de firmas si es el segundo intento (Error 410 Fix)
-      rmCacheDir: attempts > 1,
       // Soporte para cookies desde el sistema (útil en local, no en HF)
       cookiesFromBrowser: config.COOKIES_BROWSER || undefined
     };
+
+    // Limpiar caché de firmas si es el segundo intento (Error 410 Fix)
+    if (attempts > 1) {
+      options.rmCacheDir = true;
+    }
 
     if (type === "audio") {
       options.extractAudio = true;

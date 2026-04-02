@@ -9,7 +9,6 @@ import { analyzeImage } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
 import ytdlp from "yt-dlp-exec";
-import ytdl from "@distube/ytdl-core";
 import fs from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -19,6 +18,7 @@ import PQueue from "p-queue";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
+import { downloadYouTube } from "../services/youtubeService.js";
 
 // Configurar ffmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -35,29 +35,6 @@ const userRequests = new Map(); // Para rastrear envíos masivos por usuario
 const floodTracker = new Map();
 const FLOOD_LIMIT  = 15;
 const FLOOD_WINDOW = 5000; // 5 segundos
-
-// ── Helper: Convertir Cookies JSON a Netscape para yt-dlp ───────────────────────
-const jsonToNetscape = (jsonStr) => {
-  try {
-    const cookies = JSON.parse(jsonStr);
-    if (!Array.isArray(cookies)) return jsonStr;
-    
-    let netscape = "# Netscape HTTP Cookie File\n# http://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file!  Do not edit.\n\n";
-    for (const c of cookies) {
-      const domain = c.domain || "";
-      const flag = domain.startsWith(".") ? "TRUE" : "FALSE";
-      const path = c.path || "/";
-      const secure = c.secure ? "TRUE" : "FALSE";
-      const expiration = c.expirationDate || Math.floor(Date.now() / 1000) + (3600 * 24 * 365);
-      const name = c.name || "";
-      const value = c.value || "";
-      netscape += `${domain}\t${flag}\t${path}\t${secure}\t${Math.floor(expiration)}\t${name}\t${value}\n`;
-    }
-    return netscape;
-  } catch (e) {
-    return jsonStr; // Si no es JSON, devolver tal cual
-  }
-};
 
 setInterval(() => {
   const cutoff = Date.now() - FLOOD_WINDOW;
@@ -107,87 +84,14 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 
   await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } });
 
-  const tempId = crypto.randomBytes(8).toString("hex");
-  const ext = type === "audio" ? "mp3" : "mp4";
-  const outputPath = join(tmpdir(), `ytdl_${tempId}.${ext}`);
-  const cookiePath = join(tmpdir(), `cookies_${tempId}.txt`);
-
   try {
-    // Preparar opciones de yt-dlp
-    const options = {
-      output: outputPath,
-      format: type === "audio" ? "bestaudio/best" : "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      noCheckCertificates: true,
-      noWarnings: true,
-    };
-
-    if (type === "audio") {
-      options.extractAudio = true;
-      options.audioFormat = "mp3";
+    const download = await downloadYouTube(url, type);
+    
+    if (!download.success) {
+      throw new Error(download.error);
     }
 
-    // Agregar cookies si están configuradas
-    if (config.YOUTUBE_COOKIES) {
-      const netscapeCookies = jsonToNetscape(config.YOUTUBE_COOKIES);
-      fs.writeFileSync(cookiePath, netscapeCookies);
-      options.cookies = cookiePath;
-    }
-
-    // Ejecutar descarga
-    try {
-      if (!config.YOUTUBE_COOKIES) {
-        console.warn("⚠️ Advertencia: No se han configurado YOUTUBE_COOKIES. Las descargas pueden fallar con Error 403 o 410.");
-      }
-      
-      await ytdlp(url, options);
-    } catch (err) {
-      console.warn(`⚠️ yt-dlp falló (${err.message}). Intentando fallback con @distube/ytdl-core...`);
-      
-      if (type === "audio") {
-        try {
-          let agent;
-          if (config.YOUTUBE_COOKIES) {
-            try {
-              const cookiesArray = JSON.parse(config.YOUTUBE_COOKIES);
-              if (Array.isArray(cookiesArray)) {
-                agent = ytdl.createAgent(cookiesArray);
-              } else {
-                console.warn("⚠️ Las cookies no están en formato de Array JSON.");
-              }
-            } catch (e) {
-              console.warn("⚠️ Las cookies no están en formato JSON. ytdl-core no puede usar createAgent.");
-            }
-          }
-
-          const stream = ytdl(url, { 
-            quality: 'highestaudio',
-            filter: 'audioonly',
-            agent: agent
-          });
-          
-          const writeStream = fs.createWriteStream(outputPath);
-          stream.pipe(writeStream);
-          
-          await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error("Timeout en fallback de audio")), 60000);
-            writeStream.on('finish', () => { clearTimeout(timeout); resolve(); });
-            writeStream.on('error', (e) => { clearTimeout(timeout); reject(e); });
-            stream.on('error', (e) => { clearTimeout(timeout); reject(e); });
-          });
-        } catch (fallbackErr) {
-          console.error("❌ Fallback de ytdl-core también falló:", fallbackErr.message);
-          throw new Error("YouTube bloqueó todos los intentos de descarga (Error 410/403). Verifica tus YOUTUBE_COOKIES.");
-        }
-      } else {
-        throw err;
-      }
-    }
-
-    if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
-      throw new Error("El archivo descargado está vacío o no existe.");
-    }
-
+    const outputPath = download.path;
     const buffer = fs.readFileSync(outputPath);
 
     if (type === "audio") {
@@ -213,13 +117,11 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
       }, { quoted: msg });
     }
 
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     await sock.sendMessage(from, { react: { text: "✅", key: msg.key } });
   } catch (error) {
-    console.error("Error descargando con yt-dlp:", error.message);
-    await sock.sendMessage(from, { text: `❌ Error al descargar el archivo: ${error.message}` });
-  } finally {
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-    if (fs.existsSync(cookiePath)) fs.unlinkSync(cookiePath);
+    console.error("Error descargando YouTube Service:", error.message);
+    await sock.sendMessage(from, { text: `❌ Error al descargar: ${error.message}` });
   }
 
   return true;

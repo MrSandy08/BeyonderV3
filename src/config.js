@@ -16,6 +16,9 @@ export const OWNERS = process.env.OWNER_JID
   ? process.env.OWNER_JID.split(",").map((jid) => jid.trim())
   : [];
 export const YOUTUBE_COOKIES = process.env.YOUTUBE_COOKIES || "";
+export const PO_TOKEN = process.env.PO_TOKEN || "";
+export const VISITOR_DATA = process.env.VISITOR_DATA || "Cgs4R0QzQlFoOVo3ayijk7vOBjIKCgJETxIEGgAgTGLfAgrcAjE3LllUPXBEMGpVTkhLNjRKamlyaXRlaWdHUzFKY1FCNVlCVUwyWXl4VUpaNjVFaWFsSEVhZXRZeE5PaWk3TjJKR0RaMkNiV3V4anB1Y1NYdUcxZW90QUtEc05VeElkaTZJaFhFd0VCbXh4bjUwVFkxQWhvZ2lNLVoyQ0puZGFUTXlNdFhjTVJ0VGJmNXctbmhUa3hBcXZ2Ym5DSzVKZ1Flam1MdUJCaFprWHVBaEZSVVlWd011SWcySGppeTV3V0lUclladHJNV1RkUlNGZUFJVkEzdWdPc1Fmc0YzVGhZWEd3bWkxV2RoanBmUzRLN3EwUjlHQl9aTjU4UkxMaDlOallySzlrakM0MmN0ZG9JcjBBai1QWU9fSENaYkhILXdEeFRwYjJtT01DVzFfN0E4clNlQmc2WW5pQmNER3pkWmtkYkVRdlVnUncyZFUzZ2hHMktaRXRzYUJ5UQ==";
+export const COOKIES_BROWSER = process.env.COOKIES_BROWSER || "";
 export const PHONE_NUMBER = process.env.PHONE_NUMBER || "";
 export const HF_TOKEN = process.env.HF_TOKEN || "";
 
@@ -25,6 +28,9 @@ const config = {
   PREFIX,
   OWNERS,
   YOUTUBE_COOKIES,
+  PO_TOKEN,
+  VISITOR_DATA,
+  COOKIES_BROWSER,
   PHONE_NUMBER,
   HF_TOKEN,
 };

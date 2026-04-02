@@ -16,15 +16,25 @@ const ytExecutor = create(systemBinary);
  * Basado en yt-dlp con rotación de clientes y PO Tokens.
  */
 
-// User-Agents realistas para simular navegadores modernos
-const USER_AGENTS = [
-  "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+// Mapeo de Clientes y User-Agents específicos (Evita inconsistencias detectadas por YT)
+const CLIENT_CONFIGS = [
+  {
+    name: "android_vr",
+    ua: "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
+  },
+  {
+    name: "ios",
+    ua: "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)"
+  },
+  {
+    name: "android",
+    ua: "com.google.android.youtube/19.25.39 (Linux; U; Android 14; en_US; Pixel 8 Pro) gzip"
+  },
+  {
+    name: "web_creator",
+    ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+  }
 ];
-
-// Clientes de YouTube para rotación (evita bloqueos por IP/dispositivo)
-const PLAYER_CLIENTS = ["android_vr", "ios", "android", "web_creator", "mweb"];
 
 /**
  * Convierte cookies JSON (formato EditThisCookie/Chrome) a Netscape para yt-dlp
@@ -91,9 +101,9 @@ export const downloadYouTube = async (url, type = "audio") => {
   }
 
   while (attempts < maxAttempts) {
+    const configIdx = attempts % CLIENT_CONFIGS.length;
+    const { name: client, ua: userAgent } = CLIENT_CONFIGS[configIdx];
     attempts++;
-    const userAgent = USER_AGENTS[attempts % USER_AGENTS.length];
-    const client = PLAYER_CLIENTS[attempts % PLAYER_CLIENTS.length];
 
     console.log(`[YouTube] Intento ${attempts}/${maxAttempts} usando cliente: ${client}...`);
 
@@ -102,6 +112,8 @@ export const downloadYouTube = async (url, type = "audio") => {
     if (config.PO_TOKEN && config.VISITOR_DATA) {
       extractorArgs += `;po_token=${config.PO_TOKEN}+${config.VISITOR_DATA}`;
     }
+
+    const isMobile = client.includes("android") || client.includes("ios");
 
     const options = {
       output: outputPath,
@@ -112,9 +124,8 @@ export const downloadYouTube = async (url, type = "audio") => {
       // Directivas de 2026
       extractorArgs: extractorArgs,
       addHeader: [
-        "sec-ch-ua: \"Not A(Brand\";v=\"99\", \"Google Chrome\";v=\"121\", \"Chromium\";v=\"121\"",
-        "sec-ch-ua-mobile: ?0",
-        "sec-ch-ua-platform: \"Windows\"",
+        `sec-ch-ua-mobile: ${isMobile ? "?1" : "?0"}`,
+        `sec-ch-ua-platform: "${isMobile ? (client.includes("ios") ? "iOS" : "Android") : "Windows"}"`,
         "Referer: https://www.youtube.com/"
       ],
       // Soporte para cookies desde el sistema (útil en local, no en HF)

@@ -14,16 +14,24 @@ app = FastAPI()
 
 # Carga global de modelos al arrancar el Space (CPU)
 device = "cpu"
+# Optimización de hilos para CPU
+torch.set_num_threads(os.cpu_count() or 4)
+
 print("Cargando NudeNet...")
 detector = NudeDetector()
 print("Cargando CLIP...")
 model_clip, preprocess = clip.load("ViT-B/32", device=device)
 
-print("Cargando LLM (TinyLlama)...")
-model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+print("Cargando LLM (Qwen2.5-1.5B-Instruct)...")
+model_id = "Qwen/Qwen2.5-1.5B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-# Usar float32 para CPU
-llm_model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float32, device_map="cpu")
+# Usar float32 para CPU y optimizar el uso de memoria
+llm_model = AutoModelForCausalLM.from_pretrained(
+    model_id, 
+    torch_dtype=torch.float32, 
+    device_map="cpu",
+    low_cpu_mem_usage=True
+)
 llm_pipeline = pipeline("text-generation", model=llm_model, tokenizer=tokenizer, device=-1)
 
 print("Modelos cargados correctamente.")
@@ -62,34 +70,42 @@ def detect_gore(image_path):
 @app.post("/ia")
 async def get_ia_response(req: IARequest):
     try:
-        # Construir prompt siguiendo el template de TinyLlama
-        full_prompt = f"<|system|>\n{req.system_prompt}</s>\n"
+        # Construir prompt siguiendo el template de Qwen
+        messages = [{"role": "system", "content": req.system_prompt}]
         
         if req.history:
             for msg in req.history:
-                role = "user" if msg.role == "user" else "assistant"
-                full_prompt += f"<|{role}|>\n{msg.content}</s>\n"
+                messages.append({"role": msg.role, "content": msg.content})
         
-        full_prompt += f"<|user|>\n{req.prompt}</s>\n<|assistant|>\n"
+        messages.append({"role": "user", "content": req.prompt})
 
-        # Generar respuesta
+        # Generar respuesta usando el chat template del tokenizer
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
         outputs = llm_pipeline(
-            full_prompt, 
-            max_new_tokens=250, 
+            text, 
+            max_new_tokens=300, 
             do_sample=True, 
-            temperature=0.8, 
+            temperature=1.0, # Mayor temperatura para más creatividad sexual/morbosa
             top_k=50, 
-            top_p=0.95
+            top_p=0.9,
+            repetition_penalty=1.1 # Evitar que se repita
         )
         
-        # Extraer solo la parte generada después del prompt
+        # Extraer solo la respuesta generada
         generated_text = outputs[0]["generated_text"]
-        response_text = generated_text.split("<|assistant|>\n")[-1].strip()
+        response_text = generated_text.split("<|im_start|>assistant\n")[-1].strip()
+        # Limpiar si el modelo genera el token de fin
+        response_text = response_text.replace("<|im_end|>", "").strip()
         
         return {"response": response_text}
     except Exception as e:
         print(f"❌ Error en LLM: {str(e)}")
-        return {"response": "Oh, parece que me distraje pensando en cosas... traviesas. 😏"}
+        return {"response": "Ugh, mi mente está tan llena de pensamientos sucios sobre ti que mi sistema se colgó... 😏"}
 
 @app.get("/")
 def home():

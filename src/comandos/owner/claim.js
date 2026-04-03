@@ -9,7 +9,7 @@ export const onlyMod   = false;
 export const onlyOwner = false;
 
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "RY18VC";
-const MAX_OWNERS     = 2;
+const MAX_OWNERS     = 3;
 
 export const run = async (contexto) => {
   const { sender, from, args, sock, msg, react } = contexto;

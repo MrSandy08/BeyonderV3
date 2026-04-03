@@ -13,7 +13,7 @@ const NIVEL_LABELS = { 0: "👤 Miembro", 1: "⭐ Helper", 2: "🛡️ Moderador
 const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, args, msg, from } = contexto;
+  const { reply, react, args, msg, from, sock } = contexto;
 
   const rawText = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || "").trim().toLowerCase();
   const isDegrada = rawText.startsWith("!degradar");
@@ -35,12 +35,22 @@ export const run = async (contexto) => {
   let nuevoNivel;
   if (isDegrada) {
     nuevoNivel = Math.max(0, nivelAntes - 1);
+    // Quitar admin en WhatsApp si se degrada a nivel 0
+    if (nuevoNivel === 0) {
+      await sock.groupParticipantsUpdate(from, [objetivo], "demote").catch(() => {});
+    }
   } else {
     nuevoNivel = parseInt(args[1]);
     if (isNaN(nuevoNivel) || nuevoNivel < 0 || nuevoNivel > 3)
       return reply(aviso("El nivel debe ser entre *0* y *3*.\n       𝄄   _0=Miembro · 1=Helper · 2=Mod · 3=Owner_"));
+    
     if (nuevoNivel === 3)
       return reply(aviso("No puedes asignar *Owner* desde este comando.\n       𝄄   _Usa !claim con la contraseña._"));
+
+    // Dar admin en WhatsApp si se promueve a nivel 2 o superior
+    if (nuevoNivel >= 2) {
+      await sock.groupParticipantsUpdate(from, [objetivo], "promote").catch(() => {});
+    }
   }
 
   await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { permisos: nuevoNivel } }, { upsert: true });

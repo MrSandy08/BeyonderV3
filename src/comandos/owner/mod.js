@@ -38,6 +38,10 @@ export const run = async (contexto) => {
   if (antes?.permisos === 2) return reply(aviso(`@${numFromJid(objetivo)} ya es Moderador en este grupo.`), [objetivo]);
 
   await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { permisos: 2 } }, { upsert: true });
+  
+  // Dar admin en WhatsApp
+  await sock.groupParticipantsUpdate(from, [objetivo], "promote").catch(() => {});
+
   await react("✅");
   await reply(aviso(`*@${numFromJid(objetivo)}* ahora es *Moderador* 🛡️`), [objetivo]);
 };

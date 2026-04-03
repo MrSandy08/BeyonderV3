@@ -3,8 +3,8 @@ import User from "../../database/models/User.js";
 import { aviso } from "../../utils/format.js";
 import userTarget from "../../utils/userTarget.js";
 
-export const name      = "remove owner";
-export const aliases   = ["quitar owner"];
+export const name      = "removeowner";
+export const aliases   = ["quitarowner", "ro"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = true;

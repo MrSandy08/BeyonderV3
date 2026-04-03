@@ -17,6 +17,16 @@ import handleMessages from "./src/events/messages.js";
 
 const { MONGO_URI, PORT, PHONE_NUMBER, OWNERS } = config;
 
+// ── Manejo Global de Errores para evitar crasheos por Connection Closed ─────
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ Unhandled Rejection en:", promise, "razón:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err);
+  // No salimos del proceso para que el loop de reconexión de Baileys trabaje
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 //  1. CONEXIÓN A WHATSAPP (Baileys)
 // ════════════════════════════════════════════════════════════════════════════

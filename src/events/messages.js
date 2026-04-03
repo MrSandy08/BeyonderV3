@@ -52,10 +52,15 @@ async function getGroupMeta(sock, groupId) {
   const cached = metaCache.get(groupId);
   if (cached && Date.now() - cached.ts < 30_000) return cached.data;
   try {
+    if (!sock || !sock.ev) return null;
     const data = await sock.groupMetadata(groupId);
     metaCache.set(groupId, { data, ts: Date.now() });
     return data;
-  } catch (_) { return null; }
+  } catch (e) { 
+    if (e.message?.includes('Connection Closed')) return null;
+    console.error(`❌ Error getGroupMeta (${groupId}):`, e.message);
+    return null; 
+  }
 }
 
 // ── Helper: verificar si el sender es admin WA ────────────────────────────────
@@ -83,7 +88,7 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
   const { url, title, thumbnail, duration } = result;
   const type = pending.type; // "audio" o "video"
 
-  await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } });
+  await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } }).catch(() => {});
 
   try {
     const download = await downloadYouTube(url, type);
@@ -109,20 +114,21 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
             renderLargerThumbnail: true
           }
         }
-      }, { quoted: msg });
+      }, { quoted: msg }).catch(() => {});
     } else {
       await sock.sendMessage(from, {
         video: buffer,
         caption: `🎬 *${title}*\n⏱️ Duración: ${duration.timestamp}`,
         mimetype: "video/mp4"
-      }, { quoted: msg });
+      }, { quoted: msg }).catch(() => {});
     }
 
     if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-    await sock.sendMessage(from, { react: { text: "✅", key: msg.key } });
+    await sock.sendMessage(from, { react: { text: "✅", key: msg.key } }).catch(() => {});
   } catch (error) {
+    if (error.message?.includes('Connection Closed')) return true;
     console.error("Error descargando YouTube Service:", error.message);
-    await sock.sendMessage(from, { text: `❌ Error al descargar: ${error.message}` });
+    await sock.sendMessage(from, { text: `❌ Error al descargar: ${error.message}` }).catch(() => {});
   }
 
   return true;
@@ -399,8 +405,13 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         reply:  async (text, mentions = []) => {
           for (let i = 0; i < 3; i++) {
             try {
+              if (!sock || !sock.ev) return;
               return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
             } catch (e) {
+              if (e.message?.includes('Connection Closed')) {
+                console.warn(`⚠️ Intento de envío fallido: Conexión cerrada. Deteniendo reintentos.`);
+                return;
+              }
               if (i === 2) throw e;
               await new Promise(r => setTimeout(r, 1000));
             }
@@ -409,8 +420,10 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         send:   async (text, mentions = []) => {
           for (let i = 0; i < 3; i++) {
             try {
+              if (!sock || !sock.ev) return;
               return await sock.sendMessage(from, { text, mentions });
             } catch (e) {
+              if (e.message?.includes('Connection Closed')) return;
               if (i === 2) throw e;
               await new Promise(r => setTimeout(r, 1000));
             }
@@ -419,8 +432,10 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         react:  async (emoji) => {
           for (let i = 0; i < 3; i++) {
             try {
+              if (!sock || !sock.ev) return;
               return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
             } catch (e) {
+              if (e.message?.includes('Connection Closed')) return;
               if (i === 2) throw e;
               await new Promise(r => setTimeout(r, 1000));
             }
@@ -496,9 +511,11 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
         const isGore = result.type === 'GORE' && cfg.antigore;
 
         if (isNSFW || isGore) {
-          // Reacción y Borrado inmediato
-          await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
-          await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+          // Reacción y Borrado inmediato (con control de errores de conexión)
+          if (sock && sock.ev) {
+            await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
+            await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+          }
 
           // Advertencia y Notificación
           const userInDB = await User.findOne({ jid: sender, groupId: from }).lean();

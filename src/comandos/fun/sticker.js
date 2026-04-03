@@ -71,10 +71,16 @@ export const run = async ({ msg, sock, from, sender, reply, react, isGroup }) =>
     });
 
     const stickerBuffer = await sticker.toBuffer();
-    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+    if (sock && sock.ev) {
+      await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg }).catch(e => {
+        if (e.message?.includes('Connection Closed')) return;
+        throw e;
+      });
+    }
     await react("✅");
 
   } catch (error) {
+    if (error.message?.includes('Connection Closed')) return;
     console.error("Error creando sticker:", error);
     reply("❌ Error al procesar el sticker.");
     await react("❌");

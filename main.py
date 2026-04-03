@@ -22,8 +22,8 @@ detector = NudeDetector()
 print("Cargando CLIP...")
 model_clip, preprocess = clip.load("ViT-B/32", device=device)
 
-print("Cargando LLM (Qwen2.5-1.5B-Instruct)...")
-model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+print("Cargando LLM (Qwen2.5-0.5B-Instruct)...")
+model_id = "Qwen/Qwen2.5-0.5B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 # Usar float32 para CPU y optimizar el uso de memoria
 llm_model = AutoModelForCausalLM.from_pretrained(
@@ -45,13 +45,16 @@ class IARequest(BaseModel):
     system_prompt: str
     history: Optional[List[IAMessage]] = []
 
-def detect_gore(image_path):
+def detect_clip_extra(image_path):
     image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
-    # Etiquetas más descriptivas para mejorar la detección de CLIP
+    # Etiquetas para mejorar la detección de CLIP (Gore y Porn)
     text_descriptions = [
         "a photo of gore and blood", 
         "a photo of a dead person or body parts", 
         "a photo of extreme violence",
+        "pornography and sexual acts",
+        "hentai anime illustration",
+        "suggestive sexting photo",
         "a normal photo of people",
         "a landscape or object"
     ]
@@ -63,9 +66,18 @@ def detect_gore(image_path):
     
     # Sumar probabilidades de etiquetas violentas
     gore_score = float(probs[0][0] + probs[0][1] + probs[0][2])
-    is_gore = gore_score > 0.50 # Umbral más sensible
+    # Sumar probabilidades de etiquetas pornográficas
+    porn_score = float(probs[0][3] + probs[0][4] + probs[0][5])
     
-    return {"is_gore": bool(is_gore), "confidence": gore_score}
+    is_gore = gore_score > 0.50
+    is_porn = porn_score > 0.60 # Umbral para CLIP Porn
+    
+    return {
+        "is_gore": bool(is_gore), 
+        "gore_confidence": gore_score,
+        "is_porn": bool(is_porn),
+        "porn_confidence": porn_score
+    }
 
 @app.post("/ia")
 async def get_ia_response(req: IARequest):
@@ -88,7 +100,7 @@ async def get_ia_response(req: IARequest):
 
         outputs = llm_pipeline(
             text, 
-            max_new_tokens=300, 
+            max_new_tokens=200, 
             do_sample=True, 
             temperature=1.0, # Mayor temperatura para más creatividad sexual/morbosa
             top_k=50, 
@@ -125,12 +137,19 @@ async def detect_image(file: UploadFile = File(...)):
         # 1. Detección NSFW con NudeNet
         nsfw_detections = detector.detect(temp_path)
         
-        # 2. Detección Gore con CLIP
-        gore_result = detect_gore(temp_path)
+        # 2. Detección Extra con CLIP (Gore + Porn extra)
+        clip_result = detect_clip_extra(temp_path)
         
         return {
             "nsfw": nsfw_detections,
-            "gore": gore_result
+            "gore": {
+                "is_gore": clip_result["is_gore"],
+                "confidence": clip_result["gore_confidence"]
+            },
+            "porn_clip": {
+                "is_porn": clip_result["is_porn"],
+                "confidence": clip_result["porn_confidence"]
+            }
         }
     except Exception as e:
         return {"error": str(e)}

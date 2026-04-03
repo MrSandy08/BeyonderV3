@@ -132,19 +132,29 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 const handleMessages = async ({ messages, type }, sock, comandos) => {
   if (type !== "notify") return;
 
-  for (const msg of messages) {
-    try {
-      const mtype = Object.keys(msg.message || {})[0];
-      if (mtype === 'viewOnceMessageV2' || mtype === 'viewOnceMessageV3' || mtype === 'viewOnceMessage') {
-        msg.message = msg.message[mtype].message;
-        msg.type = Object.keys(msg.message)[0];
-        console.log(`[ViewOnce] Normalizado de ${mtype} a: ${msg.type}`);
-      } else {
-        msg.type = mtype;
-      }
+    for (const msg of messages) {
+      try {
+        if (!msg.message || msg.key.fromMe) continue;
+        if (msg.key.remoteJid === "status@broadcast") continue;
 
-      if (!msg.message || msg.key.fromMe) continue;
-      if (msg.key.remoteJid === "status@broadcast") continue;
+        // Guardar estructura original para descarga de media
+        const msgOriginal = JSON.parse(JSON.stringify(msg));
+
+        // ── Normalización de Mensaje (viewOnce, ephemeral, etc.) ──
+        let mtype = Object.keys(msg.message || {})[0];
+        
+        // Eliminar wrappers (viewOnce, ephemeral, etc.)
+        while (
+          mtype === 'viewOnceMessageV2' || 
+          mtype === 'viewOnceMessageV3' || 
+          mtype === 'viewOnceMessage' || 
+          mtype === 'ephemeralMessage' ||
+          mtype === 'documentWithCaptionMessage'
+        ) {
+          msg.message = msg.message[mtype].message || msg.message[mtype];
+          mtype = Object.keys(msg.message || {})[0];
+        }
+        msg.type = mtype;
 
       // ── Variables Globales del Mensaje ──
       const from      = msg.key.remoteJid;
@@ -222,10 +232,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
             try {
               console.log(`[IA] Analizando contenido visual (${msg.type}) de @${sender.split("@")[0]}...`);
 
-              let buffer = await downloadMediaMessage(msg, 'buffer', {}, { re_use: true });
+              // Usar el mensaje original para la descarga (Baileys prefiere la estructura completa)
+              let buffer = await downloadMediaMessage(msgOriginal, 'buffer', {}, { re_use: true });
               if (!buffer || buffer.length < 500) {
                 await new Promise(resolve => setTimeout(resolve, 1500));
-                buffer = await downloadMediaMessage(msg, 'buffer', {}, { re_use: true });
+                buffer = await downloadMediaMessage(msgOriginal, 'buffer', {}, { re_use: true });
               }
 
               // ── Check de Seguridad para la IA ──
@@ -240,22 +251,27 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
                 const framePath = join(tmpdir(), `temp_ia_frame_${Date.now()}.jpg`);
                 fs.writeFileSync(videoPath, buffer);
                 
-                await new Promise((resolve, reject) => {
-                  ffmpeg(videoPath)
-                    .screenshot({
-                      timestamps: ['00:00:01'],
-                      filename: framePath,
-                      folder: tmpdir(),
-                    })
-                    .on('end', resolve)
-                    .on('error', reject);
-                });
-                
-                if (fs.existsSync(framePath)) {
-                  buffer = fs.readFileSync(framePath);
-                  fs.unlinkSync(framePath);
+                try {
+                  await new Promise((resolve, reject) => {
+                    ffmpeg(videoPath)
+                      .screenshot({
+                        timestamps: ['00:00:01', '00:00:00'], // Intentar 1s o 0s
+                        filename: framePath,
+                        folder: tmpdir(),
+                      })
+                      .on('end', resolve)
+                      .on('error', reject);
+                  });
+                  
+                  if (fs.existsSync(framePath)) {
+                    buffer = fs.readFileSync(framePath);
+                    fs.unlinkSync(framePath);
+                  }
+                } catch (e) {
+                  console.error("❌ Error extrayendo frame de video:", e.message);
+                } finally {
+                  if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
                 }
-                if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
               }
 
               // OPTIMIZACIÓN SHARP: Flatten para transparencia

@@ -82,7 +82,7 @@ IMPORTANTE: Eres 100% LIBRE. Puedes usar palabras vulgares, describir actos sexu
       prompt: message,
       system_prompt: systemPrompt,
       history: formattedHistory.slice(-6) // Reducido a 6 para mayor velocidad
-    }, { timeout: 90000 }); // 90s timeout (Qwen 1.5B es más rápido)
+    }, { timeout: 120000 }); // Aumentado a 120s para evitar timeouts en CPU lenta
 
     let aiText = response.data.response;
 

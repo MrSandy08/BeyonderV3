@@ -51,18 +51,18 @@ export async function analyzeImage(buffer) {
 
     const nsfwDetections = result.nsfw || [];
     const goreResult = result.gore || { is_gore: false, confidence: 0 };
+    const pornClipResult = result.porn_clip || { is_porn: false, confidence: 0 };
     
     let isNsfw = false;
     let maxNsfwScore = 0;
     let detectedClass = null;
     let immediateDelete = false;
 
-    // Procesar detecciones con umbrales diferenciados
+    // 1. Procesar detecciones NudeNet (NSFW)
     for (const det of nsfwDetections) {
       const { class: className, score } = det;
       const threshold = NSFW_THRESHOLDS[className] || 0.70;
 
-      // Log de depuración para scores > 0.10
       if (score > 0.10) {
         console.log(`[DEBUG IA] Clase: ${className} | Score: ${score.toFixed(4)} | Threshold: ${threshold}`);
       }
@@ -74,13 +74,20 @@ export async function analyzeImage(buffer) {
           detectedClass = className;
         }
 
-        // Acción inmediata para GENITALIA (si supera 0.30)
         if (className.includes('GENITALIA') || className.includes('PHALLUS') || className.includes('VULVA') || className.includes('ANUS')) {
           immediateDelete = true;
-          // No hacemos break aquí para terminar de loguear todo si fuera necesario, 
-          // pero ya marcamos que debe borrarse ya.
         }
       }
+    }
+
+    // 2. Procesar Detección CLIP Extra (Pornografía)
+    if (pornClipResult.is_porn && pornClipResult.confidence > 0.60) {
+      isNsfw = true;
+      if (pornClipResult.confidence > maxNsfwScore) {
+        maxNsfwScore = pornClipResult.confidence;
+        detectedClass = "CLIP_NSFW_PROBABLE";
+      }
+      console.log(`[DEBUG CLIP] NSFW Detectado por CLIP | Score: ${pornClipResult.confidence.toFixed(4)}`);
     }
 
     const goreScore = typeof goreResult.confidence === 'number' ? goreResult.confidence : 0;

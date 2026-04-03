@@ -11,3 +11,6 @@ regex
 tqdm
 git+https://github.com/openai/CLIP.git
 yt-dlp
+transformers
+accelerate
+sentencepiece

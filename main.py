@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Body
 from nudenet import NudeDetector
 import os
 import shutil
@@ -6,6 +6,9 @@ import torch
 import clip
 from PIL import Image
 import io
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from pydantic import BaseModel
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -14,8 +17,25 @@ device = "cpu"
 print("Cargando NudeNet...")
 detector = NudeDetector()
 print("Cargando CLIP...")
-model, preprocess = clip.load("ViT-B/32", device=device)
+model_clip, preprocess = clip.load("ViT-B/32", device=device)
+
+print("Cargando LLM (TinyLlama)...")
+model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+# Usar float32 para CPU
+llm_model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float32, device_map="cpu")
+llm_pipeline = pipeline("text-generation", model=llm_model, tokenizer=tokenizer, device=-1)
+
 print("Modelos cargados correctamente.")
+
+class IAMessage(BaseModel):
+    role: str
+    content: str
+
+class IARequest(BaseModel):
+    prompt: str
+    system_prompt: str
+    history: Optional[List[IAMessage]] = []
 
 def detect_gore(image_path):
     image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
@@ -30,7 +50,7 @@ def detect_gore(image_path):
     text_tokens = clip.tokenize(text_descriptions).to(device)
 
     with torch.no_grad():
-        logits_per_image, _ = model(image, text_tokens)
+        logits_per_image, _ = model_clip(image, text_tokens)
         probs = logits_per_image.softmax(dim=-1).cpu().numpy()
     
     # Sumar probabilidades de etiquetas violentas
@@ -38,6 +58,38 @@ def detect_gore(image_path):
     is_gore = gore_score > 0.50 # Umbral más sensible
     
     return {"is_gore": bool(is_gore), "confidence": gore_score}
+
+@app.post("/ia")
+async def get_ia_response(req: IARequest):
+    try:
+        # Construir prompt siguiendo el template de TinyLlama
+        full_prompt = f"<|system|>\n{req.system_prompt}</s>\n"
+        
+        if req.history:
+            for msg in req.history:
+                role = "user" if msg.role == "user" else "assistant"
+                full_prompt += f"<|{role}|>\n{msg.content}</s>\n"
+        
+        full_prompt += f"<|user|>\n{req.prompt}</s>\n<|assistant|>\n"
+
+        # Generar respuesta
+        outputs = llm_pipeline(
+            full_prompt, 
+            max_new_tokens=250, 
+            do_sample=True, 
+            temperature=0.8, 
+            top_k=50, 
+            top_p=0.95
+        )
+        
+        # Extraer solo la parte generada después del prompt
+        generated_text = outputs[0]["generated_text"]
+        response_text = generated_text.split("<|assistant|>\n")[-1].strip()
+        
+        return {"response": response_text}
+    except Exception as e:
+        print(f"❌ Error en LLM: {str(e)}")
+        return {"response": "Oh, parece que me distraje pensando en cosas... traviesas. 😏"}
 
 @app.get("/")
 def home():

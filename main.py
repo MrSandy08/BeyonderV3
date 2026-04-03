@@ -123,9 +123,9 @@ async def get_ia_response(req: IARequest):
 def home():
     return {"status": "Beyond Squad Detector Online", "mode": "Hugging Face Space (CLIP + NudeNet)"}
 
-@app.post("/detect")
-async def detect_image(file: UploadFile = File(...)):
-    temp_path = f"/tmp/temp_{os.getpid()}.jpg"
+@app.post("/detect/nsfw")
+async def detect_nsfw_endpoint(file: UploadFile = File(...)):
+    temp_path = f"temp_nsfw_{os.getpid()}.jpg"
     try:
         contents = await file.read()
         if not contents:
@@ -134,10 +134,55 @@ async def detect_image(file: UploadFile = File(...)):
         with open(temp_path, "wb") as f:
             f.write(contents)
         
-        # 1. Detección NSFW con NudeNet
+        # Detección NSFW con NudeNet
         nsfw_detections = detector.detect(temp_path)
         
-        # 2. Detección Extra con CLIP (Gore + Porn extra)
+        return {"nsfw": nsfw_detections}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@app.post("/detect/gore")
+async def detect_gore_endpoint(file: UploadFile = File(...)):
+    temp_path = f"temp_gore_{os.getpid()}.jpg"
+    try:
+        contents = await file.read()
+        if not contents:
+            return {"error": "Buffer vacío"}
+            
+        with open(temp_path, "wb") as f:
+            f.write(contents)
+        
+        # Detección Gore con CLIP
+        clip_result = detect_clip_extra(temp_path)
+        
+        return {
+            "is_gore": clip_result["is_gore"],
+            "confidence": clip_result["gore_confidence"],
+            "is_porn_clip": clip_result["is_porn"], # Backup por si NudeNet falla
+            "porn_confidence": clip_result["porn_confidence"]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@app.post("/detect")
+async def detect_image(file: UploadFile = File(...)):
+    # Mantener compatibilidad por si acaso, pero preferir endpoints específicos
+    temp_path = f"temp_all_{os.getpid()}.jpg"
+    try:
+        contents = await file.read()
+        if not contents:
+            return {"error": "Buffer vacío"}
+            
+        with open(temp_path, "wb") as f:
+            f.write(contents)
+        
+        nsfw_detections = detector.detect(temp_path)
         clip_result = detect_clip_extra(temp_path)
         
         return {

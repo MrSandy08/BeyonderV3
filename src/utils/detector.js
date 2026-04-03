@@ -7,22 +7,19 @@ import FormData from 'form-data';
 
 // ── CONFIGURACIÓN INTERNA (HUGGING FACE) ─────────────────────────────────────
 const AI_SERVER_URL = `http://127.0.0.1:7860/detect`;
+const AI_NSFW_URL   = `http://127.0.0.1:7860/detect/nsfw`;
+const AI_GORE_URL   = `http://127.0.0.1:7860/detect/gore`;
 
 // ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
 const NSFW_THRESHOLDS = {
-  // EXPOSED_GENITALIA: Muy sensible (0.30 - 0.40)
   'FEMALE_GENITALIA_EXPOSED': 0.30,
   'MALE_GENITALIA_EXPOSED':   0.30,
   'ANUS_EXPOSED':             0.30,
   'PHALLUS_EXPOSED':          0.30,
   'VULVA_EXPOSED':            0.30,
   'PUBIC_HAIR_EXPOSED':       0.30,
-  
-  // EXPOSED_BREASTS: Sensibilidad media (0.50)
   'FEMALE_BREAST_EXPOSED':    0.50,
   'BREAST_EXPOSED':           0.50,
-  
-  // COVERED / OTRAS: Menos sensible (0.80)
   'COVERED_GENITALIA':        0.80,
   'COVERED_BREASTS':          0.80,
   'COVERED_BUTTOCKS':         0.80,
@@ -31,7 +28,84 @@ const NSFW_THRESHOLDS = {
 };
 
 /**
- * Analiza una imagen enviándola al servidor FastAPI en Hugging Face.
+ * Escanea una imagen solo en busca de NSFW (NudeNet)
+ */
+export async function scanNsfw(buffer) {
+  try {
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'image.jpg' });
+
+    const response = await axios.post(AI_NSFW_URL, form, {
+      headers: { ...form.getHeaders() },
+      timeout: 30000 
+    });
+
+    const result = response.data;
+    if (result.error) return { isNsfw: false, error: result.error };
+
+    const detections = result.nsfw || [];
+    let isNsfw = false;
+    let maxScore = 0;
+    let detectedClass = null;
+    let immediateDelete = false;
+
+    for (const det of detections) {
+      const { class: className, score } = det;
+      const threshold = NSFW_THRESHOLDS[className] || 0.70;
+
+      if (score >= threshold) {
+        isNsfw = true;
+        if (score > maxScore) {
+          maxScore = score;
+          detectedClass = className;
+        }
+        if (className.includes('GENITALIA') || className.includes('PHALLUS') || className.includes('VULVA') || className.includes('ANUS')) {
+          immediateDelete = true;
+        }
+      }
+    }
+
+    return { isNsfw, score: maxScore, detectedClass, immediateDelete };
+  } catch (error) {
+    console.error("❌ Error scanNsfw:", error.message);
+    return { isNsfw: false, error: error.message };
+  }
+}
+
+/**
+ * Escanea una imagen solo en busca de Gore (CLIP)
+ */
+export async function scanGore(buffer) {
+  try {
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'image.jpg' });
+
+    const response = await axios.post(AI_GORE_URL, form, {
+      headers: { ...form.getHeaders() },
+      timeout: 30000 
+    });
+
+    const result = response.data;
+    if (result.error) return { isGore: false, error: result.error };
+
+    // CLIP también puede detectar NSFW como backup
+    const isPornBackup = result.is_porn_clip && result.porn_confidence > 0.80;
+
+    return { 
+      isGore: result.is_gore || result.confidence > 0.60, 
+      goreScore: result.confidence,
+      isNsfwBackup: isPornBackup,
+      nsfwBackupScore: result.porn_confidence
+    };
+  } catch (error) {
+    console.error("❌ Error scanGore:", error.message);
+    return { isGore: false, error: error.message };
+  }
+}
+
+/**
+ * Analiza una imagen enviándola al servidor FastAPI.
+ * Mantiene compatibilidad con el código anterior.
  */
 export async function analyzeImage(buffer) {
   try {

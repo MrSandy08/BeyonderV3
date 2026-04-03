@@ -17,6 +17,7 @@ import sharp from "sharp";
 import PQueue from "p-queue";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+import { Worker } from "worker_threads";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
 import { downloadYouTube } from "../services/youtubeService.js";
 
@@ -217,139 +218,9 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
       if (isGroup && visualMessage) {
         if (cfg?.antinsfw || cfg?.antigore) {
-          const userKey = `${from}:${sender}`;
-          const currentCount = (userRequests.get(userKey) || 0) + 1;
-          userRequests.set(userKey, currentCount);
-
-          if (currentCount > 3) {
-            sock.sendMessage(from, { 
-              text: `⚠️ @${sender.split("@")[0]}, no envíes tantas imágenes seguidas, el bot las está analizando todas.`,
-              mentions: [sender]
-            }).catch(() => {});
-          }
-
-          const wasDeleted = await iaQueue.add(async () => {
-            try {
-              console.log(`[IA] Analizando contenido visual (${msg.type}) de @${sender.split("@")[0]}...`);
-
-              // Usar el mensaje original para la descarga (Baileys prefiere la estructura completa)
-              let buffer = await downloadMediaMessage(msgOriginal, 'buffer', {}, { re_use: true });
-              if (!buffer || buffer.length < 500) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                buffer = await downloadMediaMessage(msgOriginal, 'buffer', {}, { re_use: true });
-              }
-
-              // ── Check de Seguridad para la IA ──
-              if (!buffer || buffer.length === 0) {
-                console.error(`❌ [IA] Error: Buffer vacío para @${sender.split("@")[0]}. Cancelando análisis.`);
-                return false;
-              }
-
-              // EXTRAER FRAME DE VIDEO SI ES NECESARIO
-              if (msg.type === 'videoMessage') {
-                const videoPath = join(tmpdir(), `temp_ia_${Date.now()}.mp4`);
-                const framePath = join(tmpdir(), `temp_ia_frame_${Date.now()}.jpg`);
-                fs.writeFileSync(videoPath, buffer);
-                
-                try {
-                  await new Promise((resolve, reject) => {
-                    ffmpeg(videoPath)
-                      .screenshot({
-                        timestamps: ['00:00:01', '00:00:00'], // Intentar 1s o 0s
-                        filename: framePath,
-                        folder: tmpdir(),
-                      })
-                      .on('end', resolve)
-                      .on('error', reject);
-                  });
-                  
-                  if (fs.existsSync(framePath)) {
-                    buffer = fs.readFileSync(framePath);
-                    fs.unlinkSync(framePath);
-                  }
-                } catch (e) {
-                  console.error("❌ Error extrayendo frame de video:", e.message);
-                } finally {
-                  if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-                }
-              }
-
-              // OPTIMIZACIÓN SHARP: Flatten para transparencia
-              let imageToAnalyze = await sharp(buffer, { failOnError: false })
-                .flatten({ background: { r: 255, g: 255, b: 255 } }) 
-                .toFormat('jpeg')
-                .toBuffer();
-
-              if (!imageToAnalyze || imageToAnalyze.length === 0) {
-                console.error("❌ [IA] Sharp generó un buffer vacío.");
-                return false;
-              }
-
-              const analysis = await analyzeImage(imageToAnalyze);
-              
-              // Log de Calibración
-              const userInDB = await User.findOne({ jid: sender, groupId: groupJid }).lean();
-              const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
-              console.log('--- CALIBRACIÓN IA --- NSFW:', analysis.nsfwScore, 'GORE:', analysis.goreScore, 'Usuario:', fullIdentity);
-
-              // ── ACCIÓN INMEDIATA (GENITALIA) ──
-              if (analysis.immediateDelete && cfg.antinsfw) {
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                console.log(`[IA] Borrado inmediato por GENITALIA detectada (${analysis.detectedClass})`);
-              }
-
-              const goreThreshold = 0.60; // Umbral de CLIP Gore
-              const detectadoNSFW = analysis.isNsfw && cfg.antinsfw;
-              const detectadoGORE = (analysis.goreScore > goreThreshold) && cfg.antigore;
-
-              if (detectadoNSFW || detectadoGORE) {
-                // Si no se borró antes, borrar ahora
-                if (!analysis.immediateDelete) {
-                  await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
-                  await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                }
-
-                const tipo = detectadoNSFW && detectadoGORE ? "NSFW y GORE" : detectadoNSFW ? "NSFW" : "GORE";
-                const estilo = analysis.isAnime ? "Ilustración/Anime" : "Real";
-                const motivo = `${msg.type === 'stickerMessage' ? 'Sticker' : 'Contenido'} ${tipo} detectado por IA (${analysis.detectedClass || 'Gore'}).`;
-                
-                const actualizado = await User.findOneAndUpdate(
-                  { jid: sender, groupId: groupJid },
-                  { $push: { advs: { contenido: motivo, autor: "SISTEMA (IA)", fecha: new Date() } } },
-                  { upsert: true, returnDocument: "after" }
-                );
-
-                const warns = actualizado?.advs?.length || 1;
-                const admins = meta?.participants?.filter(p => p.admin).map(p => p.id) || [];
-
-                await sock.sendMessage(from, { 
-                  text: aviso(`🚨 *DETECCIÓN IA: CONTENIDO PROHIBIDO*\n\n` + 
-                    `Usuario: *${fullIdentity}*\n` + 
-                    `Tipo: *${tipo}*\n` + 
-                    `Estilo: *${estilo}*\n` + 
-                    `⚠️ Advertencia: *${warns}/3*\n\n` + 
-                    `_Detección confirmada. Administradores notificados._`), 
-                  mentions: [...admins] 
-                });
-
-                if (warns >= 3) {
-                  await sock.sendMessage(from, { text: `❌ *${fullIdentity}* expulsado por acumular 3 advertencias.` });
-                  await sock.groupParticipantsUpdate(from, [sender], "remove").catch(() => {});
-                }
-                return true; 
-              }
-              return false;
-            } catch (e) {
-              console.error("❌ Error IA:", e.message);
-              return false;
-            } finally {
-              const count = userRequests.get(userKey) || 1;
-              if (count <= 1) userRequests.delete(userKey);
-              else userRequests.set(userKey, count - 1);
-            }
-          });
-
-          if (wasDeleted) continue;
+          // LANZAR EL ANÁLISIS SIN "AWAIT" PARA NO BLOQUEAR EL BOT (UX Optimización)
+          procesarMediaBackground(sock, msgOriginal, from, sender, cfg, meta, userName);
+          // console.log(`[IA] Análisis de ${msg.type} iniciado en segundo plano para @${sender.split("@")[0]}`);
         }
       }
 
@@ -566,3 +437,105 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 };
 
 export default handleMessages;
+
+/**
+ * Procesa imágenes, stickers y videos en segundo plano usando Worker Threads.
+ * No bloquea el hilo principal de WhatsApp.
+ */
+async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userName) {
+  iaQueue.add(async () => {
+    let tempVideoPath = null;
+    try {
+      // 1. Descargar el medio
+      let buffer = await downloadMediaMessage(msg, 'buffer', {}, { re_use: true });
+      if (!buffer || buffer.length < 500) {
+        await new Promise(r => setTimeout(r, 1000));
+        buffer = await downloadMediaMessage(msg, 'buffer', {}, { re_use: true });
+      }
+      if (!buffer) return;
+
+      const mtype = Object.keys(msg.message || {})[0];
+
+      // 2. Extraer frame si es video
+      if (mtype === 'videoMessage') {
+        tempVideoPath = join(tmpdir(), `worker_temp_${Date.now()}.mp4`);
+        const framePath = join(tmpdir(), `worker_frame_${Date.now()}.jpg`);
+        fs.writeFileSync(tempVideoPath, buffer);
+        
+        await new Promise((resolve, reject) => {
+          ffmpeg(tempVideoPath)
+            .screenshot({ timestamps: ['00:00:00', '00:00:01'], filename: framePath, folder: tmpdir() })
+            .on('end', resolve)
+            .on('error', reject);
+        });
+
+        if (fs.existsSync(framePath)) {
+          buffer = fs.readFileSync(framePath);
+          fs.unlinkSync(framePath);
+        }
+      }
+
+      // 3. Lanzar Worker Thread para el análisis (Sharp + IA)
+      // Pasamos el path absoluto del worker
+      const workerPath = join(process.cwd(), 'src', 'utils', 'mediaWorker.js');
+      
+      const result = await new Promise((resolve) => {
+        const worker = new Worker(workerPath, {
+          workerData: { buffer, type: mtype }
+        });
+        worker.on('message', resolve);
+        worker.on('error', (err) => resolve({ status: 'error', error: err.message }));
+        worker.on('exit', (code) => {
+          if (code !== 0) resolve({ status: 'error', error: `Worker exit code ${code}` });
+        });
+      });
+
+      // 4. Actuar según el resultado
+      if (result.status === 'detected') {
+        const isNSFW = result.type === 'NSFW' && cfg.antinsfw;
+        const isGore = result.type === 'GORE' && cfg.antigore;
+
+        if (isNSFW || isGore) {
+          // Reacción y Borrado inmediato
+          await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
+          await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+
+          // Advertencia y Notificación
+          const userInDB = await User.findOne({ jid: sender, groupId: from }).lean();
+          const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
+          const tipoStr = result.type;
+          
+          const actualizado = await User.findOneAndUpdate(
+            { jid: sender, groupId: from },
+            { $push: { advs: { contenido: `${tipoStr} detectado por IA`, autor: "SISTEMA (IA)", fecha: new Date() } } },
+            { upsert: true, returnDocument: "after" }
+          );
+
+          const warns = actualizado?.advs?.length || 1;
+          const admins = meta?.participants?.filter(p => p.admin).map(p => p.id) || [];
+
+          await sock.sendMessage(from, { 
+            text: aviso(`🚨 *DETECCIÓN IA: ${tipoStr}*\n\n` + 
+              `Usuario: *${fullIdentity}*\n` + 
+              `Acción: *Mensaje eliminado*\n` + 
+              `Advertencia: *${warns}/3*\n\n` + 
+              `_El sistema ha detectado contenido prohibido en segundo plano._`), 
+            mentions: [...admins] 
+          });
+
+          if (warns >= 3) {
+            await sock.sendMessage(from, { text: `❌ *${fullIdentity}* expulsado por acumular 3 advertencias.` });
+            await sock.groupParticipantsUpdate(from, [sender], "remove").catch(() => {});
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ [Worker Manager Error]:", error.message);
+    } finally {
+      // 5. Limpieza de seguridad (Garantizar que no quedan temporales)
+      if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+        try { fs.unlinkSync(tempVideoPath); } catch (e) {}
+      }
+    }
+  });
+}

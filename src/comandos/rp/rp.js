@@ -106,44 +106,18 @@ export const run = async (contexto) => {
     }
 
     // Prioridad 3: Lista general (sin argumentos)
-    // Mostramos todos los personajes de la DB global, pero marcamos los del grupo actual
-    const todosGlobal = await User.find({ personaje: { $ne: null } }).lean();
+    // Mostramos todos los personajes de la DB global en una sola lista principal
+    const todosGlobal = await User.find({ personaje: { $ne: null } }).sort({ personaje: 1 }).lean();
     if (!todosGlobal.length) return reply(aviso("No hay personajes registrados todavía."));
 
-    const delGrupo = todosGlobal.filter(u => u.groupId === from);
-    const otros   = todosGlobal.filter(u => u.groupId !== from);
-
-    const adminsJids = meta?.participants?.filter(p => p.admin === "admin" || p.admin === "superadmin").map(p => p.id) || [];
+    let txt = `📜 *LISTA GLOBAL DE PERSONAJES* 📜\n\n`;
     
-    // Staff son los admins de WA + los owners globales
-    const staff    = delGrupo.filter(u => adminsJids.includes(u.jid) || u.permisos === 3 || config.OWNERS.includes(u.jid));
-    const miembros = delGrupo.filter(u => !staff.find(s => s.jid === u.jid));
+    todosGlobal.forEach((u, i) => {
+      txt += `• *${u.personaje}* — @${numFromJid(u.jid)}\n`;
+    });
 
-    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗟𝗶𝘀𝘁𝗮 𝗚𝗹𝗼𝗯𝗮𝗹 𝗱𝗲 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲𝘀 ⿻ ₊˚๑\n`;
-
-    if (staff.length) {
-      txt += listSection("𝓢TAFF (ESTE GRUPO)");
-      staff.forEach(u => {
-        txt += listItem(u.personaje, inactividadIcon(u.lastMessage));
-      });
-    }
-
-    if (miembros.length) {
-      txt += "\n" + listSection("𝓜IEMBROS (ESTE GRUPO)");
-      miembros.forEach(u => {
-        txt += listItem(u.personaje, inactividadIcon(u.lastMessage));
-      });
-    }
-
-    if (otros.length) {
-      txt += "\n" + listSection("𝓞TROS GRUPOS");
-      otros.forEach(u => {
-        txt += listItem(u.personaje, "🌐");
-      });
-    }
-
-    txt += `\n       𝄄   _🔹 +3 días · 🔸 +7 días · ▪️ Nunca habló_`;
-    return reply(txt);
+    txt += `\n       𝄄   _Total: ${todosGlobal.length} personajes registrados._`;
+    return reply(txt, todosGlobal.map(u => u.jid));
   }
 
   // ══════════════════════════════════════════════

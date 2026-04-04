@@ -75,6 +75,10 @@ const UserSchema = new Schema(
       type:    Number,
       default: 0,
     },
+    bank: {
+      type:    Number,
+      default: 0,
+    },
     cooldowns: {
       work:        { type: Date, default: null },
       slut:        { type: Date, default: null },
@@ -85,6 +89,8 @@ const UserSchema = new Schema(
       cazar:       { type: Date, default: null },
       extorsionar: { type: Date, default: null },
       recolectar:  { type: Date, default: null },
+      suerte:      { type: Date, default: null },
+      crimen:      { type: Date, default: null },
     },
     isJailed: {
       type:    Boolean,

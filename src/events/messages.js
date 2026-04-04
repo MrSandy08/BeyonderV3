@@ -450,11 +450,23 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       const permisos = dbUser?.permisos ?? 0;
       const userIsMod = isAdmin && (permisos >= 2 || isOwner);
 
-      // ── 9. Verificación de Cárcel ──────────────────────────────────────
+      // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────
       if (dbUser?.isJailed) {
-        if (dbUser.jailUntil && dbUser.jailUntil > new Date()) {
-          const restante = Math.ceil((dbUser.jailUntil - new Date()) / 60000);
-          return await sock.sendMessage(from, { text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes usar comandos. Te quedan aproximadamente *${restante} minutos* de condena.` }, { quoted: msg });
+        const ahora = new Date();
+        if (dbUser.jailUntil && dbUser.jailUntil > ahora) {
+          const ECO_CMDS = [
+            "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
+            "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
+            "extort", "recolectar", "impuestos", "cultivar", "cosechar", "plantar",
+            "crimen", "suerte"
+          ];
+
+          if (ECO_CMDS.includes(command)) {
+            const restante = Math.ceil((dbUser.jailUntil - ahora) / 60000);
+            return await sock.sendMessage(from, { 
+              text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes realizar actividades económicas mientras cumples tu condena.\n       𝄄   _Tiempo restante: ${restante} minutos_\n       𝄄   _Usa *!fianza* para salir inmediatamente._` 
+            }, { quoted: msg });
+          }
         } else {
           // Si el tiempo expiró, liberar automáticamente
           await User.updateOne({ jid: sender }, { $set: { isJailed: false, jailUntil: null } });

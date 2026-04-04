@@ -50,6 +50,10 @@ cmdLine("🌱","cultivar",        "Planta cultivos para cosechar luego."),
 cmdLine("🧺","cosechar",        "Recoge tus cultivos maduros."),
 cmdLine("🏛️","recolectar",      "Cobra impuestos (Solo Staff)."),
 cmdLine("🎁","claim / reclamar", "Reclama regalos del chat."),
+cmdLine("🏆","ricos",           "Top 10 usuarios más millonarios."),
+cmdLine("🕊️","fianza",          "Paga para salir de la cárcel."),
+cmdLine("🎰","suerte [monto]",   "Apuesta dinero en el casino."),
+cmdLine("🚬","crimen",          "Realiza un acto delictivo (70% éxito)."),
 `\n   𝄄   _Usa *!smenu* para ver comandos de Admin/Mod._`,
 ].join("");
 

@@ -4,7 +4,7 @@ import { run as runAdv } from "../mod/adv.js";
 import { run as runExcusa } from "./excusa.js";
 
 export const name      = "ver";
-export const aliases   = [];
+export const aliases   = ["v"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;

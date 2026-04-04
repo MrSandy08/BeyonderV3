@@ -87,9 +87,6 @@ export const getAiResponse = async (sender, from, userName, message, history = [
 
     // 5. Detección de acciones
     let action = null;
-    if (/patear|pateo|patearé|voy a patear/i.test(aiText)) {
-      action = "tackled";
-    }
 
     return { text: aiText, action };
 

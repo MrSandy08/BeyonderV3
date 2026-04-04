@@ -76,9 +76,35 @@ const UserSchema = new Schema(
       default: 0,
     },
     cooldowns: {
-      work:  { type: Date, default: null },
-      slut:  { type: Date, default: null },
-      daily: { type: Date, default: null },
+      work:        { type: Date, default: null },
+      slut:        { type: Date, default: null },
+      daily:       { type: Date, default: null },
+      minar:       { type: Date, default: null },
+      pescar:      { type: Date, default: null },
+      atracar:     { type: Date, default: null },
+      cazar:       { type: Date, default: null },
+      extorsionar: { type: Date, default: null },
+      recolectar:  { type: Date, default: null },
+    },
+    isJailed: {
+      type:    Boolean,
+      default: false,
+    },
+    jailUntil: {
+      type:    Date,
+      default: null,
+    },
+    dailyStreak: {
+      type:    Number,
+      default: 0,
+    },
+    lastDaily: {
+      type:    Date,
+      default: null,
+    },
+    crop: {
+      type:    Object,
+      default: null, // { type: "maiz", plantedAt: Date, harvestAt: Date }
     },
 
     // ── Notas y Advertencias ──────────────────────────────────────────────────
@@ -96,6 +122,7 @@ const UserSchema = new Schema(
       type:    String,
       default: null,
       trim:    true,
+      index:   true,
     },
     parejas: {
       type:    [String],

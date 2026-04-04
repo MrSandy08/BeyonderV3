@@ -12,9 +12,9 @@ const MS_EN_HORA = 60 * 60 * 1000;
 const MS_EN_MIN  = 60 * 1000;
 
 export const run = async (contexto) => {
-  const { reply, sender, from } = contexto;
+  const { reply, sender } = contexto;
 
-  const user = await User.findOne({ jid: sender, groupId: from });
+  const user = await User.findOne({ jid: sender });
   if (!user) return;
 
   const ahora = new Date();
@@ -25,7 +25,7 @@ export const run = async (contexto) => {
     return reply(aviso(`Aún no te has recuperado de tu último encuentro.\n       𝄄   _Tiempo restante: ${min}m ${seg}s_`));
   }
 
-  const exito = Math.random() > 0.40; // 60% éxito
+  const exito = Math.random() > 0.30; // 70% éxito (antes 60%)
   if (exito) {
     const ganancia = Math.floor(Math.random() * (1200 - 600 + 1)) + 600;
     user.money += ganancia;
@@ -33,8 +33,14 @@ export const run = async (contexto) => {
     await user.save();
     return reply(aviso(`🍒 *SLUT EXITOSO*\n\nHas tenido un encuentro fructífero y ganaste *${ganancia}* monedas.\n       𝄄   _Tu nuevo saldo: ${user.money}_`));
   } else {
-    // 40% fallo: Asaltado o Detenido
-    const multa = Math.floor(Math.random() * (500 - 200 + 1)) + 200;
+    // 30% fallo: Asaltado o Detenido
+    let multa = Math.floor(Math.random() * (500 - 200 + 1)) + 200;
+    
+    // Seguro de Pobreza: si tiene menos de $100, la pérdida es $0
+    if (user.money < 100) {
+      multa = 0;
+    }
+
     user.money = Math.max(0, user.money - multa);
     user.cooldowns.slut = new Date(ahora.getTime() + 4 * MS_EN_HORA); // 4 horas cooldown fallo
     await user.save();
@@ -46,6 +52,10 @@ export const run = async (contexto) => {
     ];
     const frase = frases[Math.floor(Math.random() * frases.length)];
     
-    return reply(aviso(`⚠️ *SLUT FALLIDO*\n\n${frase}\n       𝄄   _Perdiste ${multa} monedas y el comando entró en un enfriamiento largo._`));
+    const msgMulta = multa > 0 
+      ? `Perdiste ${multa} monedas y el comando entró en un enfriamiento largo.`
+      : `Por suerte no tenías casi nada, así que no te quitaron dinero, pero el comando entró en enfriamiento.`;
+
+    return reply(aviso(`⚠️ *SLUT FALLIDO*\n\n${frase}\n       𝄄   _${msgMulta}_`));
   }
 };

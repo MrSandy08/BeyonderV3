@@ -3,7 +3,7 @@ import User from "../../database/models/User.js";
 import { aviso } from "../../utils/format.js";
 
 export const name      = "claim";
-export const aliases   = [];
+export const aliases   = ["reclamar"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;

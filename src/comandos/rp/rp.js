@@ -7,7 +7,7 @@ import { aviso, listSection, listItem, inactividadIcon } from "../../utils/forma
 import userTarget from "../../utils/userTarget.js";
 
 export const name      = "rp";
-export const aliases   = ["lista", "inactivos", "pedir", "buscados"];
+export const aliases   = ["lista", "inactivos", "pedir", "buscados", "personajes", "miembros", "sinpersonaje"];
 export const onlyAdmin = false;
 export const onlyMod   = false; // la validación de asignación se hace dentro del run
 export const onlyOwner = false;
@@ -19,6 +19,22 @@ const normNombre   = (n)   => n?.toLowerCase().normalize("NFD").replace(/[\u0300
 
 export const run = async (contexto) => {
   const { reply, react, sender, args, command, text, isMod, isOwner, isWAAdmin, mentionedJids, msg, cfg } = contexto;
+
+  // ══════════════════════════════════════════════
+  //  !sinpersonaje — público
+  // ══════════════════════════════════════════════
+  if (command === "sinpersonaje") {
+    const { from } = contexto;
+    const sinP = await User.find({ groupId: from, personaje: null }).lean();
+    if (!sinP.length) return reply(aviso("✅ ¡Todos en este grupo tienen personaje!"));
+
+    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗨𝘀𝘂𝗮𝗿𝗶𝗼𝘀 𝘀𝗶𝗻 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲 ⿻ ₊˚๑\n`;
+    txt += listSection("𝓡ecién Llegados");
+    sinP.forEach((u, i) => {
+      txt += listItem(`${i + 1}. @${numFromJid(u.jid)}`) + "\n";
+    });
+    return reply(txt, sinP.map(u => u.jid));
+  }
 
   // ══════════════════════════════════════════════
   //  !buscados — público
@@ -41,8 +57,8 @@ export const run = async (contexto) => {
     const nombre = text;
     if (!nombre) return reply(aviso("Escribe el nombre del personaje que buscas.\n       𝄄   _Ej: !pedir Itachi Uchiha_"));
 
-    const yaOcupado = await User.findOne({ groupId: from, personaje: new RegExp(`^${nombre}$`, "i") }).lean();
-    if (yaOcupado) return reply(aviso(`*"${nombre}"* ya está ocupado por alguien en este grupo.`));
+    const yaOcupado = await User.findOne({ personaje: new RegExp(`^${nombre}$`, "i") }).lean();
+    if (yaOcupado) return reply(aviso(`*"${nombre}"* ya está ocupado globalmente por @${numFromJid(yaOcupado.jid)}.`));
 
     const yaEnLista = await Buscados.findOne({ personaje: new RegExp(`^${nombre}$`, "i") }).lean();
     if (yaEnLista) return reply(aviso(`*"${nombre}"* ya está en la lista de buscados.`));
@@ -75,44 +91,54 @@ export const run = async (contexto) => {
     if (args.length > 0) {
       const query = text;
       const match = await User.findOne({ 
-        groupId: from, 
         personaje: new RegExp(`^${query}$`, "i") 
       }).lean();
 
       if (!match) return reply(aviso(`No se encontró ningún personaje con el nombre *"${query}"*.`));
 
       return reply(
-        `👤 *DETALLES DEL PERSONAJE*\n\n` +
+        `👤 *DETALLES DEL PERSONAJE (GLOBAL)*\n\n` +
         `   - Nombre: *${match.personaje}*\n` +
         `   - Usuario: @${match.jid.split("@")[0]}\n` +
-        `   - Mensajes: ${match.msgCount || 0}`,
+        `   - Última vez visto en: ${match.groupId.split("@")[0]}`,
         [match.jid]
       );
     }
 
     // Prioridad 3: Lista general (sin argumentos)
-    const todos = await User.find({ groupId: from, personaje: { $ne: null } }).lean();
-    if (!todos.length) return reply(aviso("No hay personajes registrados todavía en este grupo."));
+    // Mostramos todos los personajes de la DB global, pero marcamos los del grupo actual
+    const todosGlobal = await User.find({ personaje: { $ne: null } }).lean();
+    if (!todosGlobal.length) return reply(aviso("No hay personajes registrados todavía."));
+
+    const delGrupo = todosGlobal.filter(u => u.groupId === from);
+    const otros   = todosGlobal.filter(u => u.groupId !== from);
 
     const adminsJids = meta?.participants?.filter(p => p.admin === "admin" || p.admin === "superadmin").map(p => p.id) || [];
     
     // Staff son los admins de WA + los owners globales
-    const staff    = todos.filter(u => adminsJids.includes(u.jid) || u.permisos === 3 || config.OWNERS.includes(u.jid));
-    const miembros = todos.filter(u => !staff.find(s => s.jid === u.jid));
+    const staff    = delGrupo.filter(u => adminsJids.includes(u.jid) || u.permisos === 3 || config.OWNERS.includes(u.jid));
+    const miembros = delGrupo.filter(u => !staff.find(s => s.jid === u.jid));
 
-    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗟𝗶𝘀𝘁𝗮 𝗱𝗲 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲𝘀 ⿻ ₊˚๑\n`;
+    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗟𝗶𝘀𝘁𝗮 𝗚𝗹𝗼𝗯𝗮𝗹 𝗱𝗲 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲𝘀 ⿻ ₊˚๑\n`;
 
     if (staff.length) {
-      txt += listSection("𝓢TAFF");
+      txt += listSection("𝓢TAFF (ESTE GRUPO)");
       staff.forEach(u => {
         txt += listItem(u.personaje, inactividadIcon(u.lastMessage));
       });
     }
 
     if (miembros.length) {
-      txt += "\n" + listSection("𝓜IEMBROS");
+      txt += "\n" + listSection("𝓜IEMBROS (ESTE GRUPO)");
       miembros.forEach(u => {
         txt += listItem(u.personaje, inactividadIcon(u.lastMessage));
+      });
+    }
+
+    if (otros.length) {
+      txt += "\n" + listSection("𝓞TROS GRUPOS");
+      otros.forEach(u => {
+        txt += listItem(u.personaje, "🌐");
       });
     }
 
@@ -159,14 +185,14 @@ export const run = async (contexto) => {
     if (cfg?.lockRp && !isOwner)
       return reply(aviso("🔒 Los personajes están bloqueados. Solo el Owner puede modificarlos."));
 
-    const u = await User.findOne({ jid: objetivo, groupId: from }).lean();
+    const u = await User.findOne({ jid: objetivo }).lean();
     if (!u?.personaje)
-      return reply(aviso(`*${numFromJid(objetivo)}* no tiene personaje asignado en este grupo.`));
+      return reply(aviso(`@${numFromJid(objetivo)} no tiene personaje asignado globalmente.`));
 
     const nombreAntes = u.personaje;
-    await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { personaje: null } });
+    await User.findOneAndUpdate({ jid: objetivo }, { $set: { personaje: null } });
     await react("✅");
-    return reply(aviso(`*${nombreAntes}* fue removido de *${numFromJid(objetivo)}*.`));
+    return reply(aviso(`*${nombreAntes}* fue removido globalmente de @${numFromJid(objetivo)}.`));
   }
 
   // ══════════════════════════════════════════════
@@ -206,21 +232,21 @@ export const run = async (contexto) => {
     );
   }
 
-  // Verificar duplicado en este grupo
+  // Verificar duplicado GLOBALMENTE
   const dup = await User.findOne({
-    groupId:   from,
     jid:       { $ne: objetivo },
     personaje: new RegExp(`^${nombre}$`, "i"),
   }).lean();
-  if (dup) return reply(aviso(`*"${nombre}"* ya pertenece a *${dup.personaje}* en este grupo.`));
+  if (dup) return reply(aviso(`*"${nombre}"* ya pertenece a @${numFromJid(dup.jid)} (visto por última vez en ${dup.groupId.split("@")[0]}).`));
 
-  // Actualizar o crear registro usando llave compuesta (jid + groupId)
+  // Actualizar o crear registro globalmente
+  // Aunque actualizamos el JID, mantenemos el groupId de donde se asignó por última vez para referencia
   await User.updateOne(
-    { jid: objetivo, groupId: from },
-    { $set: { personaje: nombre, lastPersoChange: new Date() } },
+    { jid: objetivo },
+    { $set: { personaje: nombre, lastPersoChange: new Date(), groupId: from } },
     { upsert: true }
   );
-  console.log(`[RP] Guardado: ${nombre} para ${objetivo} en ${from}`);
+  console.log(`[RP GLOBAL] Guardado: ${nombre} para ${objetivo} (en ${from})`);
 
   // Si el nombre estaba en buscados → eliminar automáticamente
   const enBuscados = await Buscados.findOneAndDelete({

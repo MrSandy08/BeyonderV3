@@ -3,7 +3,7 @@ import Config from "../../database/models/Config.js";
 import { aviso } from "../../utils/format.js";
 
 export const name      = "antifiltro";
-export const aliases   = ["antinsfw", "antigore"];
+export const aliases   = ["antinsfw", "antigore", "filtro", "filtros"];
 export const onlyAdmin = false;
 export const onlyMod   = true;
 export const onlyOwner = false;

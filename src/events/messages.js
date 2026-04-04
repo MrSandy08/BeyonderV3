@@ -20,6 +20,23 @@ import { Worker } from "worker_threads";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
 import play from "play-dl";
 
+// ── Configuración de play-dl con Cookies ─────────────────────────────────────
+const COOKIES_PATH = join(process.cwd(), "youtube_cookies.json");
+if (fs.existsSync(COOKIES_PATH)) {
+  try {
+    const cookiesArr = JSON.parse(fs.readFileSync(COOKIES_PATH, "utf-8"));
+    const cookieString = cookiesArr.map(c => `${c.name}=${c.value}`).join("; ");
+    play.setToken({
+      youtube: {
+        cookie: cookieString
+      }
+    });
+    console.log("✅ [play-dl] Cookies cargadas correctamente para evitar bloqueo de bot.");
+  } catch (e) {
+    console.error("❌ [play-dl] Error al cargar cookies de YouTube:", e.message);
+  }
+}
+
 // Configurar ffmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -97,44 +114,58 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
     
     if (isVideo) {
       // Para video usamos play.video_info y stream
-      const videoInfo = await play.video_info(url);
-      const stream = await play.stream(url, { quality: 2 }); // Calidad media/alta
-      
-      const chunks = [];
-      for await (const chunk of stream.stream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
+      try {
+        const videoInfo = await play.video_info(url);
+        const stream = await play.stream(url, { quality: 2 });
+        
+        const chunks = [];
+        for await (const chunk of stream.stream) {
+          chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
 
-      await sock.sendMessage(from, {
-        video: buffer,
-        caption: `🎬 *${title}*\n⏱️ Duración: ${duration.timestamp}`,
-        mimetype: "video/mp4"
-      }, { quoted: msg }).catch(() => {});
+        await sock.sendMessage(from, {
+          video: buffer,
+          caption: `🎬 *${title}*\n⏱️ Duración: ${duration.timestamp}`,
+          mimetype: "video/mp4"
+        }, { quoted: msg }).catch(() => {});
+      } catch (e) {
+        if (e.message.includes("bot")) {
+          return reply("❌ YouTube detectó el bot. Intenta con una URL diferente o contacta al dueño.");
+        }
+        throw e;
+      }
     } else {
       // Para audio optimizado
-      const stream = await play.stream(url, { filter: "audioonly" });
-      
-      const chunks = [];
-      for await (const chunk of stream.stream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-
-      await sock.sendMessage(from, {
-        audio: buffer,
-        mimetype: "audio/mpeg",
-        fileName: `${title}.mp3`,
-        contextInfo: {
-          externalAdReply: {
-            title,
-            body: `Duración: ${duration.timestamp}`,
-            thumbnailUrl: thumbnail,
-            mediaType: 1,
-            renderLargerThumbnail: true
-          }
+      try {
+        const stream = await play.stream(url, { filter: "audioonly" });
+        
+        const chunks = [];
+        for await (const chunk of stream.stream) {
+          chunks.push(chunk);
         }
-      }, { quoted: msg }).catch(() => {});
+        const buffer = Buffer.concat(chunks);
+
+        await sock.sendMessage(from, {
+          audio: buffer,
+          mimetype: "audio/mpeg",
+          fileName: `${title}.mp3`,
+          contextInfo: {
+            externalAdReply: {
+              title,
+              body: `Duración: ${duration.timestamp}`,
+              thumbnailUrl: thumbnail,
+              mediaType: 1,
+              renderLargerThumbnail: true
+            }
+          }
+        }, { quoted: msg }).catch(() => {});
+      } catch (e) {
+        if (e.message.includes("bot")) {
+          return reply("❌ YouTube detectó el bot. Intenta con una URL diferente o contacta al dueño.");
+        }
+        throw e;
+      }
     }
 
     await sock.sendMessage(from, { react: { text: "✅", key: msg.key } }).catch(() => {});
@@ -185,11 +216,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
       if (!sender) continue;
 
-      // ── 1. PRIORIDAD: Contador de Mensajes (Atómico) ──
+      // ── 1. PRIORIDAD: Contador de Mensajes (Atómico - GLOBAL) ──
       User.updateOne(
-        { jid: sender, groupId: groupJid },
+        { jid: sender },
         { 
-          $set: { nombre: userName, lastMessage: new Date() }, 
+          $set: { nombre: userName, lastMessage: new Date(), groupId: groupJid }, 
           $inc: { msgCount: 1 } 
         },
         { upsert: true }
@@ -325,8 +356,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               
               const tipoStr = detectadoLinkLink ? "Enlace de Grupo" : "Enlace Prohibido/NSFW";
               const actualizado = await User.findOneAndUpdate(
-                { jid: sender, groupId: groupJid },
-                { $push: { advs: { contenido: `Link prohibido (${tipoStr})`, autor: "SISTEMA", fecha: new Date() } } },
+                { jid: sender },
+                { 
+                  $push: { advs: { contenido: `Link prohibido (${tipoStr})`, autor: "SISTEMA", fecha: new Date() } },
+                  $set: { groupId: groupJid }
+                },
                 { upsert: true, returnDocument: "after" }
               );
 
@@ -387,21 +421,6 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
             await sock.sendMessage(from, { text: aiText }, { quoted: msg });
             await sock.sendPresenceUpdate('paused', from).catch(() => {});
-
-            // Ejecutar acción detectada (tackled)
-            if (action === "tackled") {
-              const tackedCmd = comandos.get("tackled");
-              if (tackedCmd) {
-                const context = {
-                  msg, sock, sender, from, args: [], command: "tackled", text: "",
-                  isGroup, isWAAdmin: isAdmin, isMod: false, isOwner: false, permisos: 0, cfg: cfg || {}, meta, config,
-                  mentionedJids: [],
-                  reply: (t) => sock.sendMessage(from, { text: t }, { quoted: msg }),
-                  react: (e) => sock.sendMessage(from, { react: { text: e, key: msg.key } })
-                };
-                await tackedCmd.run(context);
-              }
-            }
           }
           continue;
         }
@@ -421,7 +440,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       if (!comandos.has(command)) continue;
 
       const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
-      const dbUser   = await User.findOne({ jid: sender, groupId: groupJid }).select("permisos").lean();
+      const dbUser   = await User.findOne({ jid: sender }).select("permisos").lean();
       const permisos = dbUser?.permisos ?? 0;
       const userIsMod = isAdmin && (permisos >= 2 || isOwner);
 

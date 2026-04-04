@@ -2,7 +2,7 @@
 import { aviso } from "../../utils/format.js";
 
 export const name      = "ownerping";
-export const aliases   = ["opstatus"];
+export const aliases   = ["opstatus", "oping"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = true;

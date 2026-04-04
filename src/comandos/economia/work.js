@@ -12,9 +12,9 @@ const MS_EN_HORA = 60 * 60 * 1000;
 const MS_EN_MIN  = 60 * 1000;
 
 export const run = async (contexto) => {
-  const { reply, sender, from } = contexto;
+  const { reply, sender } = contexto;
 
-  const user = await User.findOne({ jid: sender, groupId: from });
+  const user = await User.findOne({ jid: sender });
   if (!user) return;
 
   const ahora = new Date();

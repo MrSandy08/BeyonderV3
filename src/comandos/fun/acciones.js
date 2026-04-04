@@ -1,6 +1,5 @@
-// src/comandos/general/acciones.js
-// Cubre: !hug !kiss !pat !bite !slap !punch
-// Usa nekos.best (gratuito, sin API key, GIFs anime)
+// src/comandos/fun/acciones.js
+// Cubre más de 60 comandos de interacción usando múltiples APIs (nekos.best, waifu.pics, purrbot)
 import User from "../../database/models/User.js";
 import { aviso } from "../../utils/format.js";
 import userTarget from "../../utils/userTarget.js";
@@ -53,7 +52,6 @@ async function gifToMp4(buffer) {
 
       command.save(outputPath);
 
-      // Timeout de 10 segundos para la conversión
       setTimeout(() => {
         command.kill();
         reject(new Error("FFmpeg conversion timeout"));
@@ -66,186 +64,199 @@ async function gifToMp4(buffer) {
   }
 }
 
-export const name      = "hug";
-export const aliases   = ["kiss", "pat", "bite", "slap", "punch", "tackled", "kabedon", "carry", "pback"];
-export const onlyAdmin = false;
-export const onlyMod   = false;
-export const onlyOwner = false;
-
-// ─── Config por acción ────────────────────────────────────────────────────────
+// ─── MAPEO DE APIs Y CONFIGURACIÓN DE ACCIONES ──────────────────────────────
 const ACCIONES = {
-  hug:   { emoji: "🤗", endpoint: "hug",   textos: [
-    "*{yo}* le da un abrazo enorme a *{target}*. 🤗",
-    "*{yo}* envuelve a *{target}* en sus brazos. 💞",
-    "*{yo}* abraza fuerte a *{target}* y no lo suelta. 🫂",
-  ]},
-  kiss:  { emoji: "💋", endpoint: "kiss",  textos: [
-    "*{yo}* le da un beso a *{target}*. 💋",
-    "*{yo}* se acerca y besa a *{target}* suavemente. 🌸",
-    "*{yo}* le roba un beso a *{target}*. 😘",
-  ]},
-  pat:   { emoji: "🥰", endpoint: "pat",   textos: [
-    "*{yo}* le da palmaditas en la cabeza a *{target}*. 🥰",
-    "*{yo}* acaricia la cabeza de *{target}* con ternura. ✨",
-    "*{yo}* le da pat pat a *{target}*. 💆",
-  ]},
-  bite:  { emoji: "😈", endpoint: "bite",  textos: [
-    "*{yo}* muerde a *{target}*. 😈",
-    "*{yo}* clava los dientes en *{target}*. 🦷",
-    "*{yo}* no pudo resistirse y mordió a *{target}*. 😏",
-  ]},
-  slap:  { emoji: "👋", endpoint: "slap",  textos: [
-    "*{yo}* le da una bofetada a *{target}*. 👋",
-    "*{yo}* abofetea a *{target}* sin contemplaciones. 😤",
-    "*{yo}* le dejó la mano marcada a *{target}*. 💢",
-  ]},
-  punch: { emoji: "👊", endpoint: "punch", textos: [
-    "*{yo}* le da un puñetazo a *{target}*. 👊",
-    "*{yo}* golpea a *{target}* con toda su fuerza. 💥",
-    "*{yo}* no aguantó más y le pegó a *{target}*. 😠",
-  ]},
-  tackled: { emoji: "🦶", endpoint: "kick", textos: [
-    "*{yo}* le da una patada a *{target}*. 🦶",
-    "*{yo}* patea a *{target}* con fuerza. 💥",
-    "*{yo}* mandó a volar a *{target}* de una patada. 💨",
-  ]},
-  kabedon: { emoji: "🫦", endpoint: "kabedon", textos: [
-    "*{yo}* acorrala a *{target}* contra la pared con intensidad. 🫦",
-    "*{yo}* deja a *{target}* sin aliento tras un kabedon. 🔥",
-    "*{yo}* domina a *{target}* con un movimiento rápido. ⛓️",
-  ]},
-  carry: { emoji: "🏋️", endpoint: "hug", textos: [ // Usamos 'hug' como fallback visual de nekos.best
-    "¡*{yo}* ha tomado a *{target}* en sus brazos! 🏋️",
-    "*{yo}* carga a *{target}* con facilidad. 💪",
-    "*{yo}* alza a *{target}* y lo lleva consigo. ✨",
-  ]},
-  pback: { emoji: "🐎", endpoint: "pat", textos: [ // Usamos 'pat' o 'hug' como fallback visual
-    "¡*{yo}* se ha subido a la espalda de *{target}*! ¡Arre! 🐎",
-    "*{yo}* cabalga sobre la espalda de *{target}*. 🐎✨",
-    "*{yo}* salta sobre *{target}* para que lo carguen. 🧸",
-  ]},
+  // --- NEKOS.BEST ---
+  hug:      { api: "nekos", endpoint: "hug",      emoji: "🤗", textos: ["*{yo}* le da un abrazo enorme a *{target}*. 🤗", "*{yo}* envuelve a *{target}* en sus brazos. 💞"] },
+  abrazo:   { api: "nekos", endpoint: "hug",      emoji: "🤗", textos: ["*{yo}* le da un abrazo enorme a *{target}*. 🤗", "*{yo}* envuelve a *{target}* en sus brazos. 💞"] },
+  kiss:     { api: "nekos", endpoint: "kiss",     emoji: "💋", textos: ["*{yo}* le da un beso a *{target}*. 💋", "*{yo}* besa suavemente a *{target}*. 🌸"] },
+  beso:     { api: "nekos", endpoint: "kiss",     emoji: "💋", textos: ["*{yo}* le da un beso a *{target}*. 💋", "*{yo}* besa suavemente a *{target}*. 🌸"] },
+  pat:      { api: "nekos", endpoint: "pat",      emoji: "🥰", textos: ["*{yo}* le da palmaditas a *{target}*. 🥰", "*{yo}* acaricia a *{target}*. ✨"] },
+  acariciar:{ api: "nekos", endpoint: "pat",      emoji: "🥰", textos: ["*{yo}* le da palmaditas a *{target}*. 🥰", "*{yo}* acaricia a *{target}*. ✨"] },
+  slap:     { api: "nekos", endpoint: "slap",     emoji: "👋", textos: ["*{yo}* le dio una bofetada a *{target}*. 👋", "*{yo}* abofeteó a *{target}*. 😤"] },
+  bofetada: { api: "nekos", endpoint: "slap",     emoji: "👋", textos: ["*{yo}* le dio una bofetada a *{target}*. 👋", "*{yo}* abofeteó a *{target}*. 😤"] },
+  cuddle:   { api: "nekos", endpoint: "cuddle",   emoji: "🫂", textos: ["*{yo}* se acurruca con *{target}*. 🫂", "*{yo}* busca mimos de *{target}*. ✨"] },
+  mimos:    { api: "nekos", endpoint: "cuddle",   emoji: "🫂", textos: ["*{yo}* se acurruca con *{target}*. 🫂", "*{yo}* busca mimos de *{target}*. ✨"] },
+  tickle:   { api: "nekos", endpoint: "tickle",   emoji: "🤏", textos: ["*{yo}* le hace cosquillas a *{target}*. 🤏✨", "*{yo}* ataca con cosquillas a *{target}*. 😂"] },
+  cosquillas:{ api: "nekos", endpoint: "tickle",  emoji: "🤏", textos: ["*{yo}* le hace cosquillas a *{target}*. 🤏✨", "*{yo}* ataca con cosquillas a *{target}*. 😂"] },
+  smile:    { api: "nekos", endpoint: "smile",    emoji: "😊", textos: ["*{yo}* le sonríe a *{target}*. 😊", "*{yo}* muestra una bella sonrisa. ✨"] },
+  sonreir:  { api: "nekos", endpoint: "smile",    emoji: "😊", textos: ["*{yo}* le sonríe a *{target}*. 😊", "*{yo}* muestra una bella sonrisa. ✨"] },
+  wave:     { api: "nekos", endpoint: "wave",     emoji: "👋", textos: ["*{yo}* saluda a *{target}*. 👋", "*{yo}* dice hola. ✨"] },
+  saludar:  { api: "nekos", endpoint: "wave",     emoji: "👋", textos: ["*{yo}* saluda a *{target}*. 👋", "*{yo}* dice hola. ✨"] },
+  blush:    { api: "nekos", endpoint: "blush",    emoji: "😳", textos: ["*{yo}* se sonroja por culpa de *{target}*. 😳", "*{yo}* está muy apenado/a. ✨"] },
+  sonrojar: { api: "nekos", endpoint: "blush",    emoji: "😳", textos: ["*{yo}* se sonroja por culpa de *{target}*. 😳", "*{yo}* está muy apenado/a. ✨"] },
+  feed:     { api: "nekos", endpoint: "feed",     emoji: "🍲", textos: ["*{yo}* le da de comer a *{target}*. 🍲", "*{yo}* alimenta a *{target}*. ✨"] },
+  alimentar:{ api: "nekos", endpoint: "feed",     emoji: "🍲", textos: ["*{yo}* le da de comer a *{target}*. 🍲", "*{yo}* alimenta a *{target}*. ✨"] },
+  cry:      { api: "nekos", endpoint: "cry",      emoji: "😭", textos: ["*{yo}* llora frente a *{target}*. 😭", "*{yo}* no puede contener las lágrimas. 💔"] },
+  llorar:   { api: "nekos", endpoint: "cry",      emoji: "😭", textos: ["*{yo}* llora frente a *{target}*. 😭", "*{yo}* no puede contener las lágrimas. 💔"] },
+  dance:    { api: "nekos", endpoint: "dance",    emoji: "💃", textos: ["*{yo}* baila con *{target}*. 💃🕺", "*{yo}* se pone a bailar. ✨"] },
+  bailar:   { api: "nekos", endpoint: "dance",    emoji: "💃", textos: ["*{yo}* baila con *{target}*. 💃🕺", "*{yo}* se pone a bailar. ✨"] },
+  pout:     { api: "nekos", endpoint: "pout",     emoji: "😤", textos: ["*{yo}* le hace un puchero a *{target}*. 😤", "*{yo}* está molesto/a. ✨"] },
+  puchero:  { api: "nekos", endpoint: "pout",     emoji: "😤", textos: ["*{yo}* le hace un puchero a *{target}*. 😤", "*{yo}* está molesto/a. ✨"] },
+  shrug:    { api: "nekos", endpoint: "shrug",    emoji: "🤷", textos: ["*{yo}* no sabe qué decirle a *{target}*. 🤷", "*{yo}* se encoge de hombros. ✨"] },
+  encogerse:{ api: "nekos", endpoint: "shrug",    emoji: "🤷", textos: ["*{yo}* no sabe qué decirle a *{target}*. 🤷", "*{yo}* se encoge de hombros. ✨"] },
+  sleep:    { api: "nekos", endpoint: "sleep",    emoji: "😴", textos: ["*{yo}* se queda dormido/a junto a *{target}*. 😴", "*{yo}* se fue a mimir. ✨"] },
+  dormir:   { api: "nekos", endpoint: "sleep",    emoji: "😴", textos: ["*{yo}* se queda dormido/a junto a *{target}*. 😴", "*{yo}* se fue a mimir. ✨"] },
+  stare:    { api: "nekos", endpoint: "stare",    emoji: "👀", textos: ["*{yo}* se queda mirando a *{target}*. 👀", "*{yo}* observa fijamente. ✨"] },
+  mirar:    { api: "nekos", endpoint: "stare",    emoji: "👀", textos: ["*{yo}* se queda mirando a *{target}*. 👀", "*{yo}* observa fijamente. ✨"] },
+  think:    { api: "nekos", endpoint: "think",    emoji: "🤔", textos: ["*{yo}* piensa en lo que dijo *{target}*. 🤔", "*{yo}* está reflexionando. ✨"] },
+  pensar:   { api: "nekos", endpoint: "think",    emoji: "🤔", textos: ["*{yo}* piensa en lo que dijo *{target}*. 🤔", "*{yo}* está reflexionando. ✨"] },
+  thumbsup: { api: "nekos", endpoint: "thumbsup", emoji: "👍", textos: ["*{yo}* le da un pulgar arriba a *{target}*. 👍", "*{yo}* aprueba lo de *{target}*. ✨"] },
+  aprobacion:{ api: "nekos", endpoint: "thumbsup", emoji: "👍", textos: ["*{yo}* le da un pulgar arriba a *{target}*. 👍", "*{yo}* aprueba lo de *{target}*. ✨"] },
+  wink:     { api: "nekos", endpoint: "wink",     emoji: "😉", textos: ["*{yo}* le guiña un ojo a *{target}*. 😉", "*{yo}* lanza un guiño. ✨"] },
+  guiño:    { api: "nekos", endpoint: "wink",     emoji: "😉", textos: ["*{yo}* le guiña un ojo a *{target}*. 😉", "*{yo}* lanza un guiño. ✨"] },
+  bored:    { api: "nekos", endpoint: "bored",    emoji: "🥱", textos: ["*{yo}* está aburrido/a de *{target}*. 🥱", "*{yo}* bosteza de aburrimiento. ✨"] },
+  aburrimiento:{ api: "nekos", endpoint: "bored", emoji: "🥱", textos: ["*{yo}* está aburrido/a de *{target}*. 🥱", "*{yo}* bosteza de aburrimiento. ✨"] },
+  laugh:    { api: "nekos", endpoint: "laugh",    emoji: "😂", textos: ["*{yo}* se ríe de *{target}*. 😂", "*{yo}* no para de reír. ✨"] },
+  risa:     { api: "nekos", endpoint: "laugh",    emoji: "😂", textos: ["*{yo}* se ríe de *{target}*. 😂", "*{yo}* no para de reír. ✨"] },
+  punch:    { api: "nekos", endpoint: "punch",    emoji: "👊", textos: ["*{yo}* le da un puñetazo a *{target}*. 👊", "*{yo}* golpeó a *{target}*. 💥"] },
+  puñetazo: { api: "nekos", endpoint: "punch",    emoji: "👊", textos: ["*{yo}* le da un puñetazo a *{target}*. 👊", "*{yo}* golpeó a *{target}*. 💥"] },
+  poke:     { api: "nekos", endpoint: "poke",     emoji: "👉", textos: ["*{yo}* pica a *{target}*. 👉✨", "*{yo}* molesta a *{target}*. 😏"] },
+  picar:    { api: "nekos", endpoint: "poke",     emoji: "👉", textos: ["*{yo}* pica a *{target}*. 👉✨", "*{yo}* molesta a *{target}*. 😏"] },
+  yeet:     { api: "nekos", endpoint: "yeet",     emoji: "💨", textos: ["*{yo}* lanza a *{target}* muy lejos. 💨", "*{yo}* hizo un YEET con *{target}*. 🚀"] },
+  lanzar:   { api: "nekos", endpoint: "yeet",     emoji: "💨", textos: ["*{yo}* lanza a *{target}* muy lejos. 💨", "*{yo}* hizo un YEET con *{target}*. 🚀"] },
+
+  // --- WAIFU.PICS ---
+  bully:    { api: "waifu", endpoint: "bully",    emoji: "😒", textos: ["*{yo}* molesta a *{target}*. 😒", "*{yo}* le hace bullying a *{target}*. ✨"] },
+  molestar: { api: "waifu", endpoint: "bully",    emoji: "😒", textos: ["*{yo}* molesta a *{target}*. 😒", "*{yo}* le hace bullying a *{target}*. ✨"] },
+  cringe:   { api: "waifu", endpoint: "cringe",   emoji: "😖", textos: ["*{yo}* siente cringe por *{target}*. 😖", "*{yo}* puso cara de asco. ✨"] },
+  asco:     { api: "waifu", endpoint: "cringe",   emoji: "😖", textos: ["*{yo}* siente cringe por *{target}*. 😖", "*{yo}* puso cara de asco. ✨"] },
+  highfive: { api: "waifu", endpoint: "highfive", emoji: "🙌", textos: ["*{yo}* choca los cinco con *{target}*. 🙌", "*{yo}* celebra con *{target}*. ✨"] },
+  cinco:    { api: "waifu", endpoint: "highfive", emoji: "🙌", textos: ["*{yo}* choca los cinco con *{target}*. 🙌", "*{yo}* celebra con *{target}*. ✨"] },
+  happy:    { api: "waifu", endpoint: "happy",    emoji: "✨", textos: ["*{yo}* está feliz con *{target}*. ✨", "*{yo}* irradia alegría. 💖"] },
+  feliz:    { api: "waifu", endpoint: "happy",    emoji: "✨", textos: ["*{yo}* está feliz con *{target}*. ✨", "*{yo}* irradia alegría. 💖"] },
+  kill:     { api: "waifu", endpoint: "kill",     emoji: "💀", textos: ["*{yo}* acaba con *{target}*. 💀", "*{yo}* eliminó a *{target}*. ⚰️"] },
+  matar:    { api: "waifu", endpoint: "kill",     emoji: "💀", textos: ["*{yo}* acaba con *{target}*. 💀", "*{yo}* eliminó a *{target}*. ⚰️"] },
+  lick:     { api: "waifu", endpoint: "lick",     emoji: "👅", textos: ["*{yo}* lame a *{target}*. 👅", "*{yo}* le dio una lamiidita a *{target}*. 😏"] },
+  lamer:    { api: "waifu", endpoint: "lick",     emoji: "👅", textos: ["*{yo}* lame a *{target}*. 👅", "*{yo}* le dio una lamiidita a *{target}*. 😏"] },
+  bite:     { api: "waifu", endpoint: "bite",     emoji: "😈", textos: ["*{yo}* muerde a *{target}*. 😈", "*{yo}* clavó sus dientes en *{target}*. ✨"] },
+  morder:   { api: "waifu", endpoint: "bite",     emoji: "😈", textos: ["*{yo}* muerde a *{target}*. 😈", "*{yo}* clavó sus dientes en *{target}*. ✨"] },
+  glare:    { api: "waifu", endpoint: "glare",    emoji: "😠", textos: ["*{yo}* mira feo a *{target}*. 😠", "*{yo}* le lanza una mirada asesina. 💢"] },
+  mirada:   { api: "waifu", endpoint: "glare",    emoji: "😠", textos: ["*{yo}* mira feo a *{target}*. 😠", "*{yo}* le lanza una mirada asesina. 💢"] },
+  nom:      { api: "waifu", endpoint: "nom",      emoji: "😋", textos: ["*{yo}* muerde a *{target}* (nom). 😋", "*{yo}* hace nom nom con *{target}*. ✨"] },
+  comer:    { api: "waifu", endpoint: "nom",      emoji: "😋", textos: ["*{yo}* muerde a *{target}* (nom). 😋", "*{yo}* hace nom nom con *{target}*. ✨"] },
+  handhold: { api: "waifu", endpoint: "handhold", emoji: "🤝", textos: ["*{yo}* toma la mano de *{target}*. 🤝", "*{yo}* entrelaza sus dedos con *{target}*. 💖"] },
+  mano:     { api: "waifu", endpoint: "handhold", emoji: "🤝", textos: ["*{yo}* toma la mano de *{target}*. 🤝", "*{yo}* entrelaza sus dedos con *{target}*. 💖"] },
+
+  // --- PURRBOT ---
+  backrub:  { api: "purr", endpoint: "backrub",  emoji: "💆", textos: ["*{yo}* le da un masaje en la espalda a *{target}*. 💆", "*{yo}* relaja a *{target}*. ✨"] },
+  masaje_espalda:{ api: "purr", endpoint: "backrub", emoji: "💆", textos: ["*{yo}* le da un masaje en la espalda a *{target}*. 💆", "*{yo}* relaja a *{target}*. ✨"] },
+  headrub:  { api: "purr", endpoint: "headrub",  emoji: "💆‍♂️", textos: ["*{yo}* le acaricia la cabeza a *{target}*. 💆‍♂️", "*{yo}* mima a *{target}*. ✨"] },
+  masaje_cabeza:{ api: "purr", endpoint: "headrub", emoji: "💆‍♂️", textos: ["*{yo}* le acaricia la cabeza a *{target}*. 💆‍♂️", "*{yo}* mima a *{target}*. ✨"] },
+  insult:   { api: "purr", endpoint: "insult",   emoji: "🖕", textos: ["*{yo}* insulta a *{target}*. 🖕", "*{yo}* le dijo de todo a *{target}*. 💢"] },
+  insultar: { api: "purr", endpoint: "insult",   emoji: "🖕", textos: ["*{yo}* insulta a *{target}*. 🖕", "*{yo}* le dijo de todo a *{target}*. 💢"] },
+  kisscheek:{ api: "purr", endpoint: "kisscheek",emoji: "😘", textos: ["*{yo}* le da un beso en la mejilla a *{target}*. 😘", "*{yo}* besa la cara de *{target}*. ✨"] },
+  beso_mejilla:{ api: "purr", endpoint: "kisscheek", emoji: "😘", textos: ["*{yo}* le da un beso en la mejilla a *{target}*. 😘", "*{yo}* besa la cara de *{target}*. ✨"] },
+  massage:  { api: "purr", endpoint: "massage",  emoji: "💆‍♀️", textos: ["*{yo}* le da un masaje a *{target}*. 💆‍♀️", "*{yo}* consiente a *{target}*. ✨"] },
+  masaje:   { api: "purr", endpoint: "massage",  emoji: "💆‍♀️", textos: ["*{yo}* le da un masaje a *{target}*. 💆‍♀️", "*{yo}* consiente a *{target}*. ✨"] },
+  spank:    { api: "purr", endpoint: "spank",    emoji: "🍑", textos: ["*{yo}* le da una nalgada a *{target}*. 🍑💨", "*{yo}* castigó a *{target}*. 😏"] },
+  nalgada:  { api: "purr", endpoint: "spank",    emoji: "🍑", textos: ["*{yo}* le da una nalgada a *{target}*. 🍑💨", "*{yo}* castigó a *{target}*. 😏"] },
+  tail:     { api: "purr", endpoint: "tail",     emoji: "🐈", textos: ["*{yo}* mueve la cola frente a *{target}*. 🐈", "*{yo}* menea su colita. ✨"] },
+  cola:     { api: "purr", endpoint: "tail",     emoji: "🐈", textos: ["*{yo}* mueve la cola frente a *{target}*. 🐈", "*{yo}* menea su colita. ✨"] },
+  vibe:     { api: "purr", endpoint: "vibe",     emoji: "🎵", textos: ["*{yo}* vibra junto a *{target}*. 🎵", "*{yo}* está en el mismo mood que *{target}*. ✨"] },
+  vibrar:   { api: "purr", endpoint: "vibe",     emoji: "🎵", textos: ["*{yo}* vibra junto a *{target}*. 🎵", "*{yo}* está en el mismo mood que *{target}*. ✨"] },
+  attack:   { api: "purr", endpoint: "attack",   emoji: "⚔️", textos: ["*{yo}* ataca a *{target}*. ⚔️", "*{yo}* se lanza contra *{target}*. 💢"] },
+  atacar:   { api: "purr", endpoint: "attack",   emoji: "⚔️", textos: ["*{yo}* ataca a *{target}*. ⚔️", "*{yo}* se lanza contra *{target}*. 💢"] },
+  dodge:    { api: "purr", endpoint: "dodge",    emoji: "💨", textos: ["*{yo}* esquiva el ataque de *{target}*. 💨", "*{yo}* fue muy rápido para *{target}*. ✨"] },
+  esquivar: { api: "purr", endpoint: "dodge",    emoji: "💨", textos: ["*{yo}* esquiva el ataque de *{target}*. 💨", "*{yo}* fue muy rápido para *{target}*. ✨"] },
+  shoot:    { api: "purr", endpoint: "shoot",    emoji: "🔫", textos: ["*{yo}* le dispara a *{target}*. 🔫", "*{yo}* abrió fuego contra *{target}*. 💥"] },
+  disparar: { api: "purr", endpoint: "shoot",    emoji: "🔫", textos: ["*{yo}* le dispara a *{target}*. 🔫", "*{yo}* abrió fuego contra *{target}*. 💥"] },
+  stab:     { api: "purr", endpoint: "stab",     emoji: "🔪", textos: ["*{yo}* apuñala a *{target}*. 🔪", "*{yo}* hirió a *{target}* con una daga. 🩸"] },
+  apuñalar: { api: "purr", endpoint: "stab",     emoji: "🔪", textos: ["*{yo}* apuñala a *{target}*. 🔪", "*{yo}* hirió a *{target}* con una daga. 🩸"] },
+
+  // --- ESPECIALES ---
+  sex:      { api: "purr", endpoint: "bite",     emoji: "🔥", textos: ["🔥 La situación se puso intensa entre *{yo}* y *{target}*... ¡Vayan a una habitación! 😏", "*{yo}* y *{target}* se están dando un revolcón. 🔥😏", "¡Qué intensidad! *{yo}* y *{target}* están en pleno acto. 🫦✨", "🔥 *{yo}* y *{target}* se dejaron llevar por el momento... ¡Uff! 😏"] },
+  sexo:     { api: "purr", endpoint: "bite",     emoji: "🔥", textos: ["🔥 La situación se puso intensa entre *{yo}* y *{target}*... ¡Vayan a una habitación! 😏", "*{yo}* y *{target}* se están dando un revolcón. 🔥😏", "¡Qué intensidad! *{yo}* y *{target}* están en pleno acto. 🫦✨", "🔥 *{yo}* y *{target}* se dejaron llevar por el momento... ¡Uff! 😏"] },
+  carry:    { api: "nekos", endpoint: "hug",      emoji: "🏋️", textos: ["¡*{yo}* ha tomado a *{target}* en sus brazos! 🏋️", "*{yo}* carga a *{target}* con facilidad. 💪"] },
+  cargar:   { api: "nekos", endpoint: "hug",      emoji: "🏋️", textos: ["¡*{yo}* ha tomado a *{target}* en sus brazos! 🏋️", "*{yo}* carga a *{target}* con facilidad. 💪"] },
+  pback:    { api: "nekos", endpoint: "pat",      emoji: "🐎", textos: ["¡*{yo}* se ha subido a la espalda de *{target}*! ¡Arre! 🐎", "*{yo}* cabalga sobre *{target}*. ✨"] },
+  caballito:{ api: "nekos", endpoint: "pat",      emoji: "🐎", textos: ["¡*{yo}* se ha subido a la espalda de *{target}*! ¡Arre! 🐎", "*{yo}* cabalga sobre *{target}*. ✨"] },
+  kabedon:  { api: "nekos", endpoint: "hug",      emoji: "🫦", textos: ["*{yo}* acorrala a *{target}* contra la pared. 🫦", "*{yo}* domina a *{target}* con un kabedon. 🔥"] },
+  acorralar:{ api: "nekos", endpoint: "hug",      emoji: "🫦", textos: ["*{yo}* acorrala a *{target}* contra la pared. 🫦", "*{yo}* domina a *{target}* con un kabedon. 🔥"] },
 };
 
-// ─── Obtener GIF desde nekos.best ─────────────────────────────────────────────
-async function fetchGif(endpoint) {
+// ─── OBTENER GIF SEGÚN API ───────────────────────────────────────────────────
+async function fetchGif(config) {
   try {
-    const res  = await axios.get(`https://nekos.best/api/v2/${endpoint}?amount=1`, {
-      headers: { "User-Agent": "BeyonderBot/3.0" },
-      timeout: 8000
-    });
-    return res.data?.results?.[0]?.url || null;
-  } catch (_) {
-    return null;
-  }
+    let url = "";
+    if (config.api === "nekos") {
+      const res = await axios.get(`https://nekos.best/api/v2/${config.endpoint}?amount=1`, { timeout: 8000 });
+      url = res.data?.results?.[0]?.url;
+    } else if (config.api === "waifu") {
+      const res = await axios.get(`https://api.waifu.pics/sfw/${config.endpoint}`, { timeout: 8000 });
+      url = res.data?.url;
+    } else if (config.api === "purr") {
+      const res = await axios.get(`https://purrbot.site/api/img/sfw/${config.endpoint}/gif`, { timeout: 8000 });
+      url = res.data?.link;
+    }
+    return url || null;
+  } catch (_) { return null; }
 }
 
-// ─── Descargar buffer del GIF ──────────────────────────────────────────────────
 async function downloadBuffer(url) {
   try {
-    const res = await axios.get(url, {
-      responseType: "arraybuffer",
-      headers: { "User-Agent": "BeyonderBot/3.0" },
-      timeout: 15000
-    });
+    const res = await axios.get(url, { responseType: "arraybuffer", timeout: 15000 });
     return Buffer.from(res.data);
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 const pick         = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ─────────────────────────────────────────────────────────────────────────────
+export const name      = "acciones";
+export const aliases   = Object.keys(ACCIONES);
+export const onlyAdmin = false;
+export const onlyMod   = false;
+export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, react, sender, mentionedJids, from, sock, msg, args } = contexto;
+  const { reply, react, sender, from, sock, msg, args } = contexto;
 
-  // Detectar cuál acción se ejecutó
-  const rawBody = (
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text || ""
-  ).trim().toLowerCase().split(/\s+/)[0].replace("!", "");
-
+  const rawBody = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || "").trim().toLowerCase().split(/\s+/)[0].slice(1);
   const accion = ACCIONES[rawBody];
-  if (!accion) return; // no debería pasar, pero por seguridad
+  if (!accion) return;
 
-  // Target — usa userTarget para detectar mención, citado o nombre
   const targetJid = await userTarget(contexto, User);
-
-  // Determinar si es una auto-acción (cuando no se especificó un target diferente)
-  const quoted = msg.message?.extendedTextMessage?.contextInfo?.participant || 
-                 msg.message?.imageMessage?.contextInfo?.participant ||
-                 msg.message?.videoMessage?.contextInfo?.participant;
-  const hasMention = mentionedJids && mentionedJids.length > 0;
-  const hasArgs    = args && args.length > 0;
-  const targetEspecificado = quoted || hasMention || hasArgs;
+  const targetEspecificado = args.length > 0 || msg.message?.extendedTextMessage?.contextInfo?.participant;
 
   let nombreYo     = `@${numFromJid(sender)}`;
   let nombreTarget = (targetJid === sender && !targetEspecificado) ? "sí mismo" : `@${numFromJid(targetJid)}`;
 
-  // Obtener nombres desde DB o fallback a número
   const dbYo     = await User.findOne({ jid: sender, groupId: from }).select("personaje").lean();
   const dbTarget = (targetJid === sender && !targetEspecificado) ? null : await User.findOne({ jid: targetJid, groupId: from }).select("personaje").lean();
 
   if (dbYo?.personaje)     nombreYo     = primerNombre(dbYo.personaje);
   if (dbTarget?.personaje) nombreTarget = primerNombre(dbTarget.personaje);
 
-  // Construir texto de la acción
-  const textoAccion = pick(accion.textos)
-    .replace("{yo}",     nombreYo)
-    .replace("{target}", nombreTarget);
+  const textoAccion = pick(accion.textos).replace("{yo}", nombreYo).replace("{target}", nombreTarget);
 
-  // Reaccionar mientras carga el GIF
   await react(accion.emoji);
+  const gifUrl = await fetchGif(accion);
 
-  // Obtener URL del GIF
-  const gifUrl = await fetchGif(accion.endpoint);
+  if (!gifUrl) return reply(aviso(textoAccion));
 
-  if (!gifUrl) {
-    // Fallback: solo texto si no hay GIF
-    return reply(aviso(textoAccion));
-  }
-
-  // Descargar buffer
   let buffer = await downloadBuffer(gifUrl);
-  if (!buffer || buffer.length === 0) {
-    return reply(aviso(textoAccion));
-  }
+  if (!buffer) return reply(aviso(textoAccion));
 
-  // Intentar convertir GIF a MP4 real para mejor compatibilidad
   let finalBuffer = buffer;
-  let converted = false;
   try {
     finalBuffer = await gifToMp4(buffer);
-    converted = true;
   } catch (err) {
-    console.error("⚠️ No se pudo convertir GIF a MP4, enviando original:", err.message);
+    console.error("⚠️ Error conversión:", err.message);
   }
 
-  // Enviar video/GIF con caption decorado
-  const caption =
-    `                 𑂯 ( ${accion.emoji} ) ⁺ 𓈒  ׁ     \n` +
-    ` 𝄄➥ _${textoAccion}_\n` +
-    `       𝄄   @𝐀𝗍𝗍𝖾 : ℬeyonder`;
+  const caption = `                 𑂯 ( ${accion.emoji} ) ⁺ 𓈒  ׁ     \n 𝄄➥ _${textoAccion}_\n       𝄄   @𝐀𝗍𝗍𝖾 : ℬeyonder`;
 
   try {
-    await sock.sendMessage(
-      from,
-      {
-        video:    finalBuffer,
-        mimetype: "video/mp4",
-        caption,
-        gifPlayback: true,  // hace que se reproduzca como GIF en WhatsApp
-        mentions: [sender, ...(targetJid !== sender ? [targetJid] : [])],
-      },
-      { quoted: msg }
-    );
+    await sock.sendMessage(from, {
+      video: finalBuffer,
+      mimetype: "video/mp4",
+      caption,
+      gifPlayback: true,
+      mentions: [sender, ...(targetJid !== sender ? [targetJid] : [])],
+    }, { quoted: msg });
   } catch (err) {
-    console.error("❌ Error enviando GIF:", err.message);
-    // Si falla el video, enviar solo texto
     await reply(aviso(textoAccion), [sender, ...(targetJid !== sender ? [targetJid] : [])]);
   }
 };

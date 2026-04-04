@@ -234,17 +234,17 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.imageMessage?.caption ||
         msg.message?.videoMessage?.caption || "";
 
-      // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
-      const economyOn = isGroup && cfg && cfg.economyActive !== false;
-      if (economyOn && !texto.startsWith(config.PREFIX) && Math.random() < 0.005) {
-        spawnRandomGift(sock, from);
-      }
-
       const isCmd   = texto.startsWith(config.PREFIX);
       const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, permisos: 3 }).lean());
       const meta    = isGroup ? await getGroupMeta(sock, from) : null;
       const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
       const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
+
+      // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
+      const economyOn = isGroup && cfg && cfg.economyActive !== false;
+      if (economyOn && !isCmd && Math.random() < 0.005) {
+        spawnRandomGift(sock, from);
+      }
 
       // ── 3. Prioridad del Interruptor (!beyonder on) ───────────────────────
       if (isCmd && (texto.toLowerCase() === `${config.PREFIX}beyonder on` || texto.toLowerCase() === `${config.PREFIX}beyonder off`)) {

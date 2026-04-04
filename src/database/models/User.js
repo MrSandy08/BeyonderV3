@@ -44,7 +44,6 @@ const UserSchema = new Schema(
       type:     String,
       required: true,
       trim:     true,
-      index:    true,
     },
     nombre: {
       type:    String,
@@ -88,9 +87,9 @@ const UserSchema = new Schema(
       atracar:     { type: Date, default: null },
       cazar:       { type: Date, default: null },
       extorsionar: { type: Date, default: null },
-      recolectar:  { type: Date, default: null },
       suerte:      { type: Date, default: null },
       crimen:      { type: Date, default: null },
+      robar:       { type: Date, default: null },
     },
     isJailed: {
       type:    Boolean,

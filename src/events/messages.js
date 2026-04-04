@@ -235,7 +235,8 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.videoMessage?.caption || "";
 
       // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
-      if (isGroup && !texto.startsWith(config.PREFIX) && Math.random() < 0.005) {
+      const economyOn = isGroup && cfg && cfg.economyActive !== false;
+      if (economyOn && !texto.startsWith(config.PREFIX) && Math.random() < 0.005) {
         spawnRandomGift(sock, from);
       }
 
@@ -449,14 +450,13 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       const ECO_CMDS = [
         "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
         "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
-        "extort", "recolectar", "impuestos", "cultivar", "cosechar", "plantar",
+        "extort", "cultivar", "cosechar", "plantar",
         "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
-        "depositar", "retirar", "fianza"
+        "depositar", "retirar", "fianza", "claim", "reclamar", "regalo", "impuesto"
       ];
 
       if (ECO_CMDS.includes(command) && isGroup && cfg && cfg.economyActive === false) {
-        await sock.sendMessage(from, { text: aviso("La economía está desactivada en este grupo. 🚫💰") }, { quoted: msg });
-        continue;
+        return; // No responder nada si la economía está en OFF
       }
 
       const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
@@ -471,7 +471,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           const ECO_CMDS = [
             "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
             "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
-            "extort", "recolectar", "impuestos", "cultivar", "cosechar", "plantar",
+            "extort", "cultivar", "cosechar", "plantar",
             "crimen", "suerte"
           ];
 
@@ -633,7 +633,6 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
           if (result.status === 'detected') {
             // ── CASO: Seguridad Alta (>85% o >95% Artwork) ──
             if (sock && sock.ev) {
-              await sock.sendMessage(from, { react: { text: "🛡️", key: msg.key } }).catch(() => {});
               await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
             }
 
@@ -646,7 +645,6 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
             await sock.sendMessage(from, { text: aviso(logMsg), mentions: [sender] }).catch(() => {});
           } else if (result.status === 'doubt') {
             // ── CASO: Duda (65% - 85%) ──
-            await sock.sendMessage(from, { react: { text: "👁️", key: msg.key } }).catch(() => {});
             console.log(`[IA DUDA] ${tipoStr} sospechoso (${prob}%) de @${sender.split("@")[0]}. No se borra.`);
           }
         }

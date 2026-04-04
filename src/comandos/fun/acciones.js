@@ -67,7 +67,7 @@ async function gifToMp4(buffer) {
 }
 
 export const name      = "hug";
-export const aliases   = ["kiss", "pat", "bite", "slap", "punch", "tackled", "kabedon"];
+export const aliases   = ["kiss", "pat", "bite", "slap", "punch", "tackled", "kabedon", "carry", "pback"];
 export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;
@@ -113,6 +113,16 @@ const ACCIONES = {
     "*{yo}* acorrala a *{target}* contra la pared con intensidad. 🫦",
     "*{yo}* deja a *{target}* sin aliento tras un kabedon. 🔥",
     "*{yo}* domina a *{target}* con un movimiento rápido. ⛓️",
+  ]},
+  carry: { emoji: "🏋️", endpoint: "hug", textos: [ // Usamos 'hug' como fallback visual de nekos.best
+    "¡*{yo}* ha tomado a *{target}* en sus brazos! 🏋️",
+    "*{yo}* carga a *{target}* con facilidad. 💪",
+    "*{yo}* alza a *{target}* y lo lleva consigo. ✨",
+  ]},
+  pback: { emoji: "🐎", endpoint: "pat", textos: [ // Usamos 'pat' o 'hug' como fallback visual
+    "¡*{yo}* se ha subido a la espalda de *{target}*! ¡Arre! 🐎",
+    "*{yo}* cabalga sobre la espalda de *{target}*. 🐎✨",
+    "*{yo}* salta sobre *{target}* para que lo carguen. 🧸",
   ]},
 };
 

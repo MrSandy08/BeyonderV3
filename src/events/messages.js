@@ -18,7 +18,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { Worker } from "worker_threads";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
-import { downloadCobalt, isCobaltUrl } from "../services/downloadService.js";
+import play from "play-dl";
 
 // Configurar ffmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -93,15 +93,34 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
   await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } }).catch(() => {});
 
   try {
-    const download = await downloadCobalt(url, mode);
+    const isVideo = text.toLowerCase().includes("mp4");
     
-    if (!download.success) {
-      throw new Error(download.error);
-    }
+    if (isVideo) {
+      // Para video usamos play.video_info y stream
+      const videoInfo = await play.video_info(url);
+      const stream = await play.stream(url, { quality: 2 }); // Calidad media/alta
+      
+      const chunks = [];
+      for await (const chunk of stream.stream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
 
-    const buffer = download.buffer;
+      await sock.sendMessage(from, {
+        video: buffer,
+        caption: `🎬 *${title}*\n⏱️ Duración: ${duration.timestamp}`,
+        mimetype: "video/mp4"
+      }, { quoted: msg }).catch(() => {});
+    } else {
+      // Para audio optimizado
+      const stream = await play.stream(url, { filter: "audioonly" });
+      
+      const chunks = [];
+      for await (const chunk of stream.stream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
 
-    if (mode === "audio") {
       await sock.sendMessage(from, {
         audio: buffer,
         mimetype: "audio/mpeg",
@@ -116,18 +135,12 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
           }
         }
       }, { quoted: msg }).catch(() => {});
-    } else {
-      await sock.sendMessage(from, {
-        video: buffer,
-        caption: `🎬 *${title}*\n⏱️ Duración: ${duration.timestamp}`,
-        mimetype: "video/mp4"
-      }, { quoted: msg }).catch(() => {});
     }
 
     await sock.sendMessage(from, { react: { text: "✅", key: msg.key } }).catch(() => {});
   } catch (error) {
     if (error.message?.includes('Connection Closed')) return true;
-    console.error("Error descargando con Cobalt:", error.message);
+    console.error("Error descargando con play-dl:", error.message);
     await sock.sendMessage(from, { text: `❌ Error al descargar: ${error.message}` }).catch(() => {});
   }
 

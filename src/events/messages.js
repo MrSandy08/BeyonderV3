@@ -217,16 +217,6 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
       if (!sender) continue;
 
-      // ── 1. PRIORIDAD: Contador de Mensajes (Atómico - GLOBAL) ──
-      User.updateOne(
-        { jid: sender },
-        { 
-          $set: { nombre: userName, lastMessage: new Date(), groupId: groupJid }, 
-          $inc: { msgCount: 1 } 
-        },
-        { upsert: true }
-      ).catch(e => console.error("❌ Error DB Contador:", e.message));
-
       // ── 2. Extraer texto y metadatos básicos ───────────────────────────
       const texto =
         msg.message?.conversation ||
@@ -239,6 +229,33 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       const meta    = isGroup ? await getGroupMeta(sock, from) : null;
       const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
       const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
+
+      // ── 1. PRIORIDAD: Contador de Mensajes y Autoreparación (GLOBAL) ──
+      // Usamos findOneAndUpdate con upsert para evitar E11000 y reparar perfiles
+      const dbUser = await User.findOneAndUpdate(
+        { jid: sender },
+        { 
+          $setOnInsert: { 
+            nombre: userName,
+            personaje: null,
+            money: 0,
+            bank: 0,
+            msgCount: 0,
+            permisos: 0,
+            lastDaily: new Date(0)
+          },
+          $set: { 
+            lastMessage: new Date(), 
+            groupId: groupJid,
+            nombre: userName 
+          }, 
+          $inc: { msgCount: 1 } 
+        },
+        { upsert: true, new: true, lean: true }
+      ).catch(e => {
+        console.error("❌ Error DB Contador:", e.message);
+        return null;
+      });
 
       // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
       const economyOn = isGroup && cfg && cfg.economyActive !== false;
@@ -460,7 +477,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
       const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
-      const dbUser   = await User.findOne({ jid: sender }).select("permisos isJailed jailUntil").lean();
+      
       const permisos = dbUser?.permisos ?? 0;
       const userIsMod = isAdmin && (permisos >= 2 || isOwner);
 

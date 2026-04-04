@@ -18,6 +18,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { Worker } from "worker_threads";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
+import { spawnRandomGift } from "../comandos/economia/claim.js";
 import play from "play-dl";
 
 // ── Configuración de play-dl con Cookies ─────────────────────────────────────
@@ -233,6 +234,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.imageMessage?.caption ||
         msg.message?.videoMessage?.caption || "";
 
+      // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
+      if (isGroup && !texto.startsWith(config.PREFIX) && Math.random() < 0.005) {
+        spawnRandomGift(sock, from);
+      }
+
       const isCmd   = texto.startsWith(config.PREFIX);
       const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, permisos: 3 }).lean());
       const meta    = isGroup ? await getGroupMeta(sock, from) : null;
@@ -440,9 +446,20 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       if (!comandos.has(command)) continue;
 
       const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
-      const dbUser   = await User.findOne({ jid: sender }).select("permisos").lean();
+      const dbUser   = await User.findOne({ jid: sender }).select("permisos isJailed jailUntil").lean();
       const permisos = dbUser?.permisos ?? 0;
       const userIsMod = isAdmin && (permisos >= 2 || isOwner);
+
+      // ── 9. Verificación de Cárcel ──────────────────────────────────────
+      if (dbUser?.isJailed) {
+        if (dbUser.jailUntil && dbUser.jailUntil > new Date()) {
+          const restante = Math.ceil((dbUser.jailUntil - new Date()) / 60000);
+          return await sock.sendMessage(from, { text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes usar comandos. Te quedan aproximadamente *${restante} minutos* de condena.` }, { quoted: msg });
+        } else {
+          // Si el tiempo expiró, liberar automáticamente
+          await User.updateOne({ jid: sender }, { $set: { isJailed: false, jailUntil: null } });
+        }
+      }
 
       let tienePermiso = true;
       let motivo       = "";

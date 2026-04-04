@@ -8,7 +8,6 @@ export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;
 
-const MS_EN_HORA = 60 * 60 * 1000;
 const MS_EN_MIN  = 60 * 1000;
 
 export const run = async (contexto) => {
@@ -29,7 +28,7 @@ export const run = async (contexto) => {
   if (exito) {
     const ganancia = Math.floor(Math.random() * (1200 - 600 + 1)) + 600;
     user.money += ganancia;
-    user.cooldowns.slut = new Date(ahora.getTime() + 20 * MS_EN_MIN); // 20 min cooldown éxito
+    user.cooldowns.slut = new Date(ahora.getTime() + 3 * MS_EN_MIN); // 3 min cooldown éxito
     await user.save();
     return reply(aviso(`🍒 *SLUT EXITOSO*\n\nHas tenido un encuentro fructífero y ganaste *${ganancia}* monedas.\n       𝄄   _Tu nuevo saldo: ${user.money}_`));
   } else {
@@ -42,7 +41,7 @@ export const run = async (contexto) => {
     }
 
     user.money = Math.max(0, user.money - multa);
-    user.cooldowns.slut = new Date(ahora.getTime() + 4 * MS_EN_HORA); // 4 horas cooldown fallo
+    user.cooldowns.slut = new Date(ahora.getTime() + 15 * MS_EN_MIN); // 15 min cooldown fallo
     await user.save();
     
     const frases = [

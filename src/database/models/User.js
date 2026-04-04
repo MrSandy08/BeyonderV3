@@ -154,10 +154,10 @@ const UserSchema = new Schema(
 
 // ─── Índices adicionales ─────────────────────────────────────────────────────
 
-UserSchema.index({ jid: 1, groupId: 1 }, { unique: true });
+UserSchema.index({ jid: 1 }, { unique: true });
 UserSchema.index({ permisos: 1 });
 UserSchema.index({ "afk.activa": 1 });
-UserSchema.index({ personaje: 1, groupId: 1 });
+UserSchema.index({ personaje: 1 });
 
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 

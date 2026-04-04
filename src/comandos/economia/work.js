@@ -8,7 +8,6 @@ export const onlyAdmin = false;
 export const onlyMod   = false;
 export const onlyOwner = false;
 
-const MS_EN_HORA = 60 * 60 * 1000;
 const MS_EN_MIN  = 60 * 1000;
 
 export const run = async (contexto) => {
@@ -25,17 +24,17 @@ export const run = async (contexto) => {
     return reply(aviso(`Estás agotado para trabajar. Descansa un poco.\n       𝄄   _Tiempo restante: ${min}m ${seg}s_`));
   }
 
-  const exito = Math.random() > 0.15; // 85% éxito
+  const exito = Math.random() > 0.05; // 95% éxito
   if (exito) {
     const ganancia = Math.floor(Math.random() * (500 - 100 + 1)) + 100;
     user.money += ganancia;
-    user.cooldowns.work = new Date(ahora.getTime() + 10 * MS_EN_MIN); // 10 min cooldown normal
+    user.cooldowns.work = new Date(ahora.getTime() + 2 * MS_EN_MIN); // 2 min cooldown
     await user.save();
     return reply(aviso(`💼 *TRABAJO EXITOSO*\n\nHas trabajado duro hoy y ganaste *${ganancia}* monedas.\n       𝄄   _Tu nuevo saldo: ${user.money}_`));
   } else {
-    // 15% fallo: Despedido por 2 horas
-    user.cooldowns.work = new Date(ahora.getTime() + 2 * MS_EN_HORA);
+    // 5% fallo: Despedido por 10 min
+    user.cooldowns.work = new Date(ahora.getTime() + 10 * MS_EN_MIN);
     await user.save();
-    return reply(aviso(`⚠️ *TRABAJO FALLIDO*\n\n¡Cometiste un error grave en el trabajo y te han despedido!\n       𝄄   _No puedes trabajar por las próximas 2 horas._`));
+    return reply(aviso(`⚠️ *TRABAJO FALLIDO*\n\n¡Cometiste un error grave en el trabajo y te han despedido!\n       𝄄   _No puedes trabajar por los próximos 10 minutos._`));
   }
 };

@@ -260,15 +260,6 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
       // B. AntiFlood
-      // ... (código existente) ...
-
-      // ── SISTEMA DE APELACIÓN (CUARENTENA) ──
-      if (isCmd && (comando === "error" || comando === "check")) {
-        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-          return reply("⚠️ Responde al mensaje del bot que notificó el borrado.");
-        }
-        return reply("🛡️ *REVISIÓN SOLICITADA*\n\nHe registrado este posible error de mis sensores. Un administrador revisará el log para verificar si fue un falso positivo. ¡Gracias por avisar! 👁️");
-      }
       if (isGroup && cfg?.antiflood && !isCmd) {
         const key  = `${from}:${sender}`;
         const now  = Date.now();
@@ -286,6 +277,19 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           setTimeout(() => sock.groupSettingUpdate(from, "not_announcement").catch(() => {}), 30_000);
           continue;
         }
+      }
+
+      // ── SISTEMA DE APELACIÓN (CUARENTENA) ──
+      const bodyTmp = texto.trim();
+      const cmdTmp  = isCmd ? bodyTmp.split(/\s+/)[0].toLowerCase().slice(config.PREFIX.length) : "";
+      
+      if (isCmd && (cmdTmp === "error" || cmdTmp === "check")) {
+        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+          await sock.sendMessage(from, { text: aviso("⚠️ Responde al mensaje del bot que notificó el borrado.") }, { quoted: msg });
+          continue;
+        }
+        await sock.sendMessage(from, { text: aviso("🛡️ *REVISIÓN SOLICITADA*\n\nHe registrado este posible error de mis sensores. Un administrador revisará el log para verificar si fue un falso positivo. ¡Gracias por avisar! 👁️") }, { quoted: msg });
+        continue;
       }
 
       // C. Filtros de Texto (Enlaces)

@@ -3,6 +3,7 @@ import User from "../../database/models/User.js";
 import { solicitudes } from "../../store/solicitudes.js";
 import { aviso } from "../../utils/format.js";
 import userTarget from "../../utils/userTarget.js";
+import { isAncestor, areSiblings } from "../../utils/kinship.js";
 
 export const name      = "marry";
 export const aliases   = ["casar", "proponer"];
@@ -45,6 +46,20 @@ export const run = async (contexto) => {
     const uT = await User.findOne({ jid: tId, groupId: from }).lean();
     if (!uT?.personaje) { await sock.sendMessage(from, { text: aviso(`@${numFromJid(tId)} no tiene personaje asignado en este grupo.`), mentions: [tId] }, { quoted: msg }); continue; }
     if (uT.parejas?.length > 0 && !targets.includes(uT.parejas[0])) { await sock.sendMessage(from, { text: aviso(`*${primerNombre(uT.personaje)}* ya tiene pareja en este grupo. 💔`), mentions: [tId] }, { quoted: msg }); continue; }
+    
+    // VALIDACIÓN DE INCESTO (Adopción / Kinship)
+    // 1. ¿Es su hijo/descendiente?
+    const esDescendiente = await isAncestor(sender, tId, from);
+    if (esDescendiente) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con un descendiente! *${primerNombre(uT.personaje)}* es de tu linaje.`), mentions: [tId] }, { quoted: msg }); continue; }
+    
+    // 2. ¿Es su padre/antecesor?
+    const esAncestro = await isAncestor(tId, sender, from);
+    if (esAncestro) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con un antecesor! *${primerNombre(uT.personaje)}* es parte de tu linaje directo.`), mentions: [tId] }, { quoted: msg }); continue; }
+    
+    // 3. ¿Son hermanos?
+    const sonHermanos = await areSiblings(sender, tId, from);
+    if (sonHermanos) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con tu hermano/a! Comparten el mismo origen.`), mentions: [tId] }, { quoted: msg }); continue; }
+
     targetsValidos.push(tId);
   }
 

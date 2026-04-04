@@ -33,6 +33,26 @@ export const run = async (contexto) => {
     clearTimeout(solicitud.timer);
     solicitudes.delete(matchKey);
 
+    if (solicitud.type === "adopt") {
+      const parentJid = solicitud.sender;
+      const childJid  = solicitud.targets[0];
+      
+      // Actualizar parentesco en ambos usuarios
+      await User.findOneAndUpdate({ jid: parentJid, groupId: from }, { $addToSet: { "kinship.children": childJid } }, { upsert: true });
+      await User.findOneAndUpdate({ jid: childJid, groupId: from }, { $set: { "kinship.parent": parentJid } }, { upsert: true });
+      
+      const parentU = await User.findOne({ jid: parentJid, groupId: from }).lean();
+      const childU  = await User.findOne({ jid: childJid, groupId: from }).lean();
+      const pNombre = primerNombre(parentU?.personaje || numFromJid(parentJid));
+      const cNombre = primerNombre(childU?.personaje || numFromJid(childJid));
+      
+      return sock.sendMessage(from, {
+        text: aviso(`🏡 *ADOPCIÓN CONFIRMADA*\n\n¡Felicidades! *${pNombre}* ha adoptado oficialmente a *${cNombre}* en este grupo. 🌸`),
+        mentions: [parentJid, childJid],
+      });
+    }
+
+    // Lógica por defecto: Matrimonio (marry)
     const todos = [solicitud.sender, ...solicitud.targets];
     for (const jid of todos) {
       await User.findOneAndUpdate({ jid, groupId: from }, { $addToSet: { parejas: { $each: todos.filter(j => j !== jid) } } }, { upsert: true });

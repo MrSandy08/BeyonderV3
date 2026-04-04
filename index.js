@@ -120,6 +120,68 @@ const conectarWhatsApp = async (comandos) => {
       handleMessages(upsert, sock, comandos)
     );
 
+    // ── Gestión de Salida de Usuarios (Limpieza de Datos) ──────────────────
+    sock.ev.on("group-participants.update", async (update) => {
+      const { id, participants, action } = update;
+      
+      if (action === "remove") {
+        for (const jid of participants) {
+          console.log(`[LIMPIEZA] Usuario ${jid} salió del grupo ${id}. Limpiando datos...`);
+          
+          try {
+            // 1. Obtener datos del usuario antes de limpiar para romper vínculos
+            const user = await User.findOne({ jid, groupId: id });
+            if (!user) continue;
+
+            // 2. Romper vínculos de pareja (Poliamor/Pareja)
+            if (user.parejas && user.parejas.length > 0) {
+              for (const pJid of user.parejas) {
+                await User.findOneAndUpdate(
+                  { jid: pJid, groupId: id },
+                  { $pull: { parejas: jid } }
+                );
+              }
+            }
+
+            // 3. Romper vínculos de parentesco (Hijos)
+            if (user.kinship?.children && user.kinship.children.length > 0) {
+              for (const cJid of user.kinship.children) {
+                await User.findOneAndUpdate(
+                  { jid: cJid, groupId: id },
+                  { $set: { "kinship.parent": null } }
+                );
+              }
+            }
+
+            // 4. Romper vínculo con el padre
+            if (user.kinship?.parent) {
+              await User.findOneAndUpdate(
+                { jid: user.kinship.parent, groupId: id },
+                { $pull: { "kinship.children": jid } }
+              );
+            }
+
+            // 5. Limpiar personaje y resetear vínculos del usuario que salió
+            await User.findOneAndUpdate(
+              { jid, groupId: id },
+              { 
+                $set: { 
+                  personaje: null,
+                  parejas: [],
+                  "kinship.parent": null,
+                  "kinship.children": []
+                } 
+              }
+            );
+            
+            console.log(`✅ Datos de ${jid} limpiados correctamente.`);
+          } catch (err) {
+            console.error(`❌ Error en limpieza de datos para ${jid}:`, err.message);
+          }
+        }
+      }
+    });
+
     return sock;
   } catch (err) {
     console.error("❌ Error fatal en conectarWhatsApp:", err.message);

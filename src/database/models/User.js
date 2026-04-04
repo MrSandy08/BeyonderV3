@@ -70,6 +70,17 @@ const UserSchema = new Schema(
       default: null,
     },
 
+    // ── Economía ─────────────────────────────────────────────────────────────
+    money: {
+      type:    Number,
+      default: 0,
+    },
+    cooldowns: {
+      work:  { type: Date, default: null },
+      slut:  { type: Date, default: null },
+      daily: { type: Date, default: null },
+    },
+
     // ── Notas y Advertencias ──────────────────────────────────────────────────
     notas: {
       type:    [NotaSchema],
@@ -89,6 +100,10 @@ const UserSchema = new Schema(
     parejas: {
       type:    [String],
       default: [],
+    },
+    kinship: {
+      parent:   { type: String, default: null }, // JID del padre/madre
+      children: { type: [String], default: [] }, // JIDs de los hijos
     },
 
     // ── AFK / Excusas ─────────────────────────────────────────────────────────

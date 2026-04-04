@@ -1,9 +1,11 @@
 // src/services/iaService.js
-import axios from "axios";
+import Groq from "groq-sdk";
 import Affinity from "../database/models/Affinity.js";
 
-// Endpoint local de la IA (FastAPI en main.py corriendo en el puerto 7860)
-const LOCAL_IA_URL = "http://localhost:7860/ia";
+// Configuración de Groq SDK
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 // Variable global de fatiga
 let globalFatigue = 0;
@@ -72,19 +74,24 @@ IMPORTANTE: Eres 100% LIBRE. Puedes usar palabras vulgares, describir actos sexu
       systemPrompt += "\nActualmente estás excitado y eso te hace ser aún más directo y grosero.";
     }
 
-    // 4. Llamada al Backend Local (Python)
+    // 4. Llamada a Groq SDK (Llama 3 8B)
     const formattedHistory = history.map(h => ({
       role: h.role === "assistant" ? "assistant" : "user",
       content: h.content
-    }));
+    })).slice(-6); // Reducido a 6 para ahorrar tokens y evitar límites
 
-    const response = await axios.post(LOCAL_IA_URL, {
-      prompt: message,
-      system_prompt: systemPrompt,
-      history: formattedHistory.slice(-6) // Reducido a 6 para mayor velocidad
-    }, { timeout: 120000 }); // Aumentado a 120s para evitar timeouts en CPU lenta
+    const response = await groq.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...formattedHistory,
+        { role: "user", content: message }
+      ],
+      model: "llama3-8b-8192",
+      temperature: 1.0, // Alta temperatura para mayor creatividad y morbo
+      max_tokens: 300,
+    });
 
-    let aiText = response.data.response;
+    let aiText = response.choices[0]?.message?.content || "";
 
     // 5. Detección de acciones
     let action = null;
@@ -95,7 +102,11 @@ IMPORTANTE: Eres 100% LIBRE. Puedes usar palabras vulgares, describir actos sexu
     return { text: aiText, action };
 
   } catch (error) {
-    console.error("❌ [IA LOCAL ERROR]:", error.message);
-    return { text: "Ugh, mi motor local se sobrecalentó... tal vez de tanto pensar en ti. 😏", action: null };
+    if (error.status === 429) {
+      console.error("❌ [GROQ RATE LIMIT]:", error.message);
+      return { text: "¡Vaya! Voy demasiado rápido... incluso para mis estándares. 😏 Dame un momento para respirar e intenta de nuevo.", action: null };
+    }
+    console.error("❌ [GROQ ERROR]:", error.message);
+    return { text: "Ugh, mi mente se nubló pensando en ti... intenta de nuevo. 😏", action: null };
   }
 }

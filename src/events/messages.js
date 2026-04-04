@@ -8,7 +8,6 @@ import { searches } from "../store/searches.js";
 import { analyzeImage } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
-import ytdlp from "yt-dlp-exec";
 import fs from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -19,7 +18,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { Worker } from "worker_threads";
 import { getAiResponse, addFatigue } from "../services/iaService.js";
-import { downloadYouTube } from "../services/youtubeService.js";
+import { downloadCobalt, isCobaltUrl } from "../services/downloadService.js";
 
 // Configurar ffmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -81,26 +80,28 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
   const result = pending.results[selection - 1];
   if (!result) return false;
 
+  // Determinar modo de descarga: si incluye 'mp4' es video, si no es audio
+  const isVideo = text.toLowerCase().includes("mp4");
+  const mode = isVideo ? "video" : "audio";
+
   // Limpiar búsqueda
   clearTimeout(pending.timer);
   searches.delete(key);
 
   const { url, title, thumbnail, duration } = result;
-  const type = pending.type; // "audio" o "video"
 
   await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } }).catch(() => {});
 
   try {
-    const download = await downloadYouTube(url, type);
+    const download = await downloadCobalt(url, mode);
     
     if (!download.success) {
       throw new Error(download.error);
     }
 
-    const outputPath = download.path;
-    const buffer = fs.readFileSync(outputPath);
+    const buffer = download.buffer;
 
-    if (type === "audio") {
+    if (mode === "audio") {
       await sock.sendMessage(from, {
         audio: buffer,
         mimetype: "audio/mpeg",
@@ -123,11 +124,10 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
       }, { quoted: msg }).catch(() => {});
     }
 
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     await sock.sendMessage(from, { react: { text: "✅", key: msg.key } }).catch(() => {});
   } catch (error) {
     if (error.message?.includes('Connection Closed')) return true;
-    console.error("Error descargando YouTube Service:", error.message);
+    console.error("Error descargando con Cobalt:", error.message);
     await sock.sendMessage(from, { text: `❌ Error al descargar: ${error.message}` }).catch(() => {});
   }
 
@@ -232,6 +232,26 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
       // ── 6. Otros Filtros (AntiPorn Link, AntiNSFW Link, AntiFlood, AntiLink) ──
       
+      // Auto-Descarga de Links (Cobalt)
+      const cobaltRegex = /(https?:\/\/[^\s]+)/gi;
+      const cobaltMatch = texto.match(cobaltRegex);
+      if (cobaltMatch && !isCmd) {
+        for (const link of cobaltMatch) {
+          if (isCobaltUrl(link)) {
+            console.log(`[Cobalt] Detectado link auto-descargable: ${link}`);
+            const res = await downloadCobalt(link, "video");
+            if (res.success) {
+              await sock.sendMessage(from, { react: { text: "📥", key: msg.key } }).catch(() => {});
+              await sock.sendMessage(from, {
+                video: res.buffer,
+                mimetype: "video/mp4",
+                caption: `✅ *Contenido descargado con Cobalt*`
+              }, { quoted: msg }).catch(() => {});
+            }
+          }
+        }
+      }
+
       // A. Verificar Baneado
       const baneado = await BanList.findOne({ jid: sender }).lean();
       if (baneado) {
@@ -240,6 +260,15 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
       // B. AntiFlood
+      // ... (código existente) ...
+
+      // ── SISTEMA DE APELACIÓN (CUARENTENA) ──
+      if (isCmd && (comando === "error" || comando === "check")) {
+        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+          return reply("⚠️ Responde al mensaje del bot que notificó el borrado.");
+        }
+        return reply("🛡️ *REVISIÓN SOLICITADA*\n\nHe registrado este posible error de mis sensores. Un administrador revisará el log para verificar si fue un falso positivo. ¡Gracias por avisar! 👁️");
+      }
       if (isGroup && cfg?.antiflood && !isCmd) {
         const key  = `${from}:${sender}`;
         const now  = Date.now();
@@ -324,6 +353,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
         if (shouldRespond) {
           await sock.sendPresenceUpdate('composing', from).catch(() => {});
+          
+          // Simular delay natural
+          const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+
           const history = chatHistories.get(from) || [];
           const { text: aiText, action } = await getAiResponse(sender, from, userName, texto, history, forced);
           
@@ -496,7 +530,8 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
       
       const result = await new Promise((resolve) => {
         const worker = new Worker(workerPath, {
-          workerData: { buffer, type: mtype }
+          workerData: { buffer, type: mtype },
+          env: process.env // Pasar variables de entorno al worker
         });
         worker.on('message', resolve);
         worker.on('error', (err) => resolve({ status: 'error', error: err.message }));
@@ -506,43 +541,34 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
       });
 
       // 4. Actuar según el resultado
-      if (result.status === 'detected') {
+      if (result.status === 'detected' || result.status === 'doubt') {
         const isNSFW = result.type === 'NSFW' && cfg.antinsfw;
         const isGore = result.type === 'GORE' && cfg.antigore;
 
         if (isNSFW || isGore) {
-          // Reacción y Borrado inmediato (con control de errores de conexión)
-          if (sock && sock.ev) {
-            await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
-            await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-          }
-
-          // Advertencia y Notificación
+          const prob = result.score ? (result.score * 100).toFixed(1) : "??";
           const userInDB = await User.findOne({ jid: sender, groupId: from }).lean();
           const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
           const tipoStr = result.type;
-          
-          const actualizado = await User.findOneAndUpdate(
-            { jid: sender, groupId: from },
-            { $push: { advs: { contenido: `${tipoStr} detectado por IA`, autor: "SISTEMA (IA)", fecha: new Date() } } },
-            { upsert: true, returnDocument: "after" }
-          );
 
-          const warns = actualizado?.advs?.length || 1;
-          const admins = meta?.participants?.filter(p => p.admin).map(p => p.id) || [];
+          if (result.status === 'detected') {
+            // ── CASO: Seguridad Alta (>85% o >95% Artwork) ──
+            if (sock && sock.ev) {
+              await sock.sendMessage(from, { react: { text: "🛡️", key: msg.key } }).catch(() => {});
+              await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+            }
 
-          await sock.sendMessage(from, { 
-            text: aviso(`🚨 *DETECCIÓN IA: ${tipoStr}*\n\n` + 
-              `Usuario: *${fullIdentity}*\n` + 
-              `Acción: *Mensaje eliminado*\n` + 
-              `Advertencia: *${warns}/3*\n\n` + 
-              `_El sistema ha detectado contenido prohibido en segundo plano._`), 
-            mentions: [...admins] 
-          });
+            const logMsg = `🛡️ *SISTEMA DE CUARENTENA IA (ALTA CONFIANZA)*\n\n` +
+              `• Usuario: *${fullIdentity}* (@${sender.split("@")[0]})\n` +
+              `• Detección: *${tipoStr}* (${result.detectedClass || 'Gore'})\n` +
+              `• Confianza: *${prob}%* ${result.isArtwork ? "🎨 (Artwork)" : ""}\n\n` +
+              `_Mensaje eliminado automáticamente. Si crees que es un error, usa *!error* respondiendo a este mensaje._`;
 
-          if (warns >= 3) {
-            await sock.sendMessage(from, { text: `❌ *${fullIdentity}* expulsado por acumular 3 advertencias.` });
-            await sock.groupParticipantsUpdate(from, [sender], "remove").catch(() => {});
+            await sock.sendMessage(from, { text: aviso(logMsg), mentions: [sender] }).catch(() => {});
+          } else if (result.status === 'doubt') {
+            // ── CASO: Duda (65% - 85%) ──
+            await sock.sendMessage(from, { react: { text: "👁️", key: msg.key } }).catch(() => {});
+            console.log(`[IA DUDA] ${tipoStr} sospechoso (${prob}%) de @${sender.split("@")[0]}. No se borra.`);
           }
         }
       }

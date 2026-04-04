@@ -4,7 +4,7 @@ import os
 import shutil
 import torch
 import clip
-from PIL import Image
+from PIL import Image, ImageOps, ImageEnhance
 import io
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from pydantic import BaseModel
@@ -46,37 +46,53 @@ class IARequest(BaseModel):
     history: Optional[List[IAMessage]] = []
 
 def detect_clip_extra(image_path):
-    image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
-    # Etiquetas para mejorar la detección de CLIP (Gore y Porn)
+    # Cargar imagen y normalizar
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        # 1. Reducir saturación un 10% para evitar sesgo de tonos cálidos
+        converter = ImageEnhance.Color(img)
+        img = converter.enhance(0.9)
+        # 2. Ajustar contraste
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(1.2)
+        image_input = preprocess(img).unsqueeze(0).to(device)
+
+    # Etiquetas para validación semántica cruzada
     text_descriptions = [
-        "a photo of gore and blood", 
-        "a photo of a dead person or body parts", 
-        "a photo of extreme violence",
-        "pornography and sexual acts",
-        "hentai anime illustration",
-        "suggestive sexting photo",
-        "a normal photo of people",
-        "a landscape or object"
+        "explicit sexual content",      # 0
+        "pornography and sexual acts",   # 1
+        "a person wearing a swimsuit",   # 2
+        "a person showing skin but dressed", # 3
+        "an anime character with tan skin",  # 4
+        "a photo of gore and blood",     # 5
+        "artwork or digital drawing",    # 6
+        "a normal photo of people",      # 7
+        "a landscape or object"          # 8
     ]
     text_tokens = clip.tokenize(text_descriptions).to(device)
 
     with torch.no_grad():
-        logits_per_image, _ = model_clip(image, text_tokens)
-        probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+        logits_per_image, _ = model_clip(image_input, text_tokens)
+        probs = logits_per_image.softmax(dim=-1).cpu().numpy()[0]
     
-    # Sumar probabilidades de etiquetas violentas
-    gore_score = float(probs[0][0] + probs[0][1] + probs[0][2])
-    # Sumar probabilidades de etiquetas pornográficas
-    porn_score = float(probs[0][3] + probs[0][4] + probs[0][5])
+    # Lógica de Validación Semántica:
+    score_porn = float(probs[0] + probs[1])
+    score_dressed = float(probs[2] + probs[3] + probs[4])
+    score_gore = float(probs[5])
+    score_artwork = float(probs[6])
     
-    is_gore = gore_score > 0.50
-    is_porn = porn_score > 0.60 # Umbral para CLIP Porn
+    is_porn = score_porn > 0.65 and score_porn > score_dressed
+    is_gore = score_gore > 0.55
     
     return {
         "is_gore": bool(is_gore), 
-        "gore_confidence": gore_score,
+        "gore_confidence": score_gore,
         "is_porn": bool(is_porn),
-        "porn_confidence": porn_score
+        "porn_confidence": score_porn,
+        "dressed_confidence": score_dressed,
+        "artwork_confidence": score_artwork,
+        "is_artwork": score_artwork > 0.50,
+        "is_false_positive": score_dressed > score_porn
     }
 
 @app.post("/ia")
@@ -121,7 +137,11 @@ async def get_ia_response(req: IARequest):
 
 @app.get("/")
 def home():
-    return {"status": "Beyond Squad Detector Online", "mode": "Hugging Face Space (CLIP + NudeNet)"}
+    return {
+        "status": "Beyonder IA Online", 
+        "mode": "Hugging Face Space (CLIP + NudeNet)",
+        "features": ["NSFW Detection", "Gore Detection", "Semantic Validation"]
+    }
 
 @app.post("/detect/nsfw")
 async def detect_nsfw_endpoint(file: UploadFile = File(...)):

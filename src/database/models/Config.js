@@ -19,6 +19,7 @@ const schema = new mongoose.Schema(
     lockAntigore:  { type: Boolean, default: false },
     lockAntifiltro: { type: Boolean, default: false }, // Bloquea antinsfw y antigore
     lockAntiflood: { type: Boolean, default: false },
+    economyActive: { type: Boolean, default: true  },
   },
   { timestamps: true, versionKey: false }
 );

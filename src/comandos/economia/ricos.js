@@ -13,36 +13,42 @@ const numFromJid = (jid) => jid?.split("@")[0] || jid;
 export const run = async (contexto) => {
   const { reply } = contexto;
 
-  // Obtenemos todos los usuarios que tengan dinero o banco
-  const usuarios = await User.find({ $or: [{ money: { $gt: 0 } }, { bank: { $gt: 0 } }] }).lean();
+  // Agregación de MongoDB para unificar por JID (en caso de que haya duplicados históricos)
+  // y sumar Cartera + Banco
+  const top10 = await User.aggregate([
+    {
+      $group: {
+        _id: "$jid",
+        totalCartera: { $sum: { $ifNull: ["$money", 0] } },
+        totalBanco:   { $sum: { $ifNull: ["$bank", 0] } },
+        nombre:       { $first: { $ifNull: ["$personaje", { $ifNull: ["$nombre", "Usuario"] }] } }
+      }
+    },
+    {
+      $addFields: {
+        totalGlobal: { $add: ["$totalCartera", "$totalBanco"] }
+      }
+    },
+    { $match: { totalGlobal: { $gt: 0 } } },
+    { $sort: { totalGlobal: -1 } },
+    { $limit: 10 }
+  ]);
 
-  if (!usuarios.length) {
+  if (!top10.length) {
     return reply(aviso("No hay usuarios con dinero registrado todavía. 💸"));
   }
-
-  // Calculamos el total (Cartera + Banco) y ordenamos
-  const top10 = usuarios
-    .map(u => ({
-      jid:      u.jid,
-      nombre:   u.personaje || u.nombre || "Usuario",
-      total:    (u.money || 0) + (u.bank || 0),
-      cartera:  u.money || 0,
-      banco:    u.bank || 0
-    }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
 
   let txt = `🏆 *TOP 10 USUARIOS MÁS RICOS (GLOBAL)* 🏆\n\n`;
 
   top10.forEach((u, i) => {
     const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👤";
     txt += `${medalla} *${i + 1}. ${u.nombre}*\n`;
-    txt += `   𝄄   Total: *$${u.total.toLocaleString()}*\n`;
-    txt += `   𝄄   Cartera: $${u.cartera.toLocaleString()} | Banco: $${u.banco.toLocaleString()}\n`;
-    txt += `   𝄄   ID: @${numFromJid(u.jid)}\n\n`;
+    txt += `   𝄄   Total: *$${u.totalGlobal.toLocaleString()}*\n`;
+    txt += `   𝄄   Cartera: $${u.totalCartera.toLocaleString()} | Banco: $${u.totalBanco.toLocaleString()}\n`;
+    txt += `   𝄄   ID: @${numFromJid(u._id)}\n\n`;
   });
 
   txt += `       𝄄   _¡Sigue trabajando para entrar al top!_`;
 
-  return reply(txt, top10.map(u => u.jid));
+  return reply(txt, top10.map(u => u._id));
 };

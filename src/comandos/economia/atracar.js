@@ -33,26 +33,49 @@ export const run = async (contexto) => {
   }
 
   const victim = await User.findOne({ jid: targetJid });
-  if (!victim || victim.money < 100) {
+  const totalVictima = (victim?.money || 0) + (victim?.bank || 0);
+  
+  if (!victim || totalVictima < 200) {
     return reply(aviso("Esa persona no tiene suficiente dinero para valer la pena el riesgo. 💸"));
   }
 
   const suerte = Math.random();
-  const exito = suerte < 0.45; // 45% éxito
+  // 45% éxito normal (cartera), 15% éxito crítico (banco)
+  const exitoCritico = suerte < 0.15;
+  const exitoNormal   = suerte < 0.45;
 
-  if (exito) {
-    const porcentaje = Math.floor(Math.random() * (20 - 10 + 1)) + 10;
-    const botin = Math.floor(victim.money * (porcentaje / 100));
+  if (exitoNormal || exitoCritico) {
+    let botin = 0;
+    let mensaje = "";
+    
+    if (exitoCritico && victim.bank > 0) {
+      // Asalto Bancario: 5-10% del banco
+      const porcentaje = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
+      botin = Math.floor(victim.bank * (porcentaje / 100));
+      victim.bank -= botin;
+      mensaje = `🏦 *¡ASALTO BANCARIO CRÍTICO!* 🏦\n\n¡Lograste hackear la cuenta de @${numFromJid(targetJid)} y robaste *${botin.toLocaleString()}* monedas de su banco!`;
+    } else {
+      // Atraco normal: 10-20% de la cartera
+      const porcentaje = Math.floor(Math.random() * (20 - 10 + 1)) + 10;
+      botin = Math.floor(victim.money * (porcentaje / 100));
+      if (botin <= 0 && victim.bank > 0) {
+        // Si no tiene nada en cartera pero sí en banco, el robo falla o es mínimo
+        botin = Math.min(victim.bank, 50); 
+        victim.bank -= botin;
+      } else {
+        victim.money -= botin;
+      }
+      mensaje = `🔫 *ATRACO EXITOSO*\n\n¡Has robado *${botin.toLocaleString()}* monedas a @${numFromJid(targetJid)}! 💰💨`;
+    }
     
     user.money += botin;
-    victim.money -= botin;
     user.cooldowns.atracar = new Date(ahora.getTime() + 3 * MS_EN_MIN);
     
     await user.save();
     await victim.save();
     await react("🔫");
     
-    return reply(aviso(`🔫 *ATRACO EXITOSO*\n\n¡Has robado *${botin}* monedas (un ${porcentaje}%) a @${numFromJid(targetJid)}! 💰💨`), [targetJid]);
+    return reply(aviso(`${mensaje}`), [targetJid]);
   } else {
     // Fallo: Cárcel por 1 hora y multa
     const fianza = Math.floor(Math.random() * (500 - 200 + 1)) + 200;

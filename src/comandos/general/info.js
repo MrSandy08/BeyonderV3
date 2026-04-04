@@ -20,16 +20,38 @@ const RANGO_LABEL = {
 };
 
 export const run = async (contexto) => {
-  const { reply, from } = contexto;
+  const { reply, from, sender, pushname } = contexto;
 
   const objetivo = await userTarget(contexto, User);
   
   // Buscar datos del usuario GLOBALMENTE
-  const u = await User.findOne({ jid: objetivo }).lean();
+  let u = await User.findOne({ jid: objetivo }).lean();
+  
+  // Lógica de autoreparación: Si no existe el usuario pero se solicitó info (o tiene dinero pero no perfil)
+  if (!u && objetivo === sender) {
+    // Crear perfil básico si el propio usuario usa !info y no existe
+    u = await User.findOneAndUpdate(
+      { jid: objetivo },
+      { 
+        $set: { 
+          nombre: pushname || "Usuario",
+          groupId: from,
+          money: 0,
+          bank: 0
+        } 
+      },
+      { upsert: true, new: true, lean: true }
+    );
+  }
+
+  // Si después de intentar reparar sigue sin existir (ej: info @alguien que nunca habló)
+  if (!u) {
+    const isGlobalOwner = config.OWNERS.includes(objetivo);
+    if (!isGlobalOwner) return reply(aviso(`@${numFromJid(objetivo)} no tiene datos registrados todavía.`));
+  }
   
   // Verificar si es Owner global (por .env o por permisos: 3)
-  const isGlobalOwner = config.OWNERS.includes(objetivo) || 
-                        (u?.permisos === 3);
+  const isGlobalOwner = config.OWNERS.includes(objetivo) || (u?.permisos === 3);
 
   // Verificar si es Admin de WhatsApp en este grupo
   const participant = contexto.meta?.participants?.find(p => p.id === objetivo);
@@ -39,18 +61,16 @@ export const run = async (contexto) => {
   if (isGlobalOwner) {
     nivelReal = 3;
   } else if (isWAAdmin) {
-    // Si es admin de WA, al menos es Moderador (nivel 2)
     nivelReal = Math.max(nivelReal, 2);
   }
 
   const rango = RANGO_LABEL[nivelReal] || "👤 Miembro";
   
-  if (!u && !isGlobalOwner) return reply(aviso(`@${numFromJid(objetivo)} no tiene datos registrados todavía.`));
-
   const advCount  = u?.advs?.length  || 0;
   const mensajes  = u?.msgCount      || 0;
   const personaje = u?.personaje     || "Sin asignar";
-  const money     = u?.money         || 0;
+  const cartera   = u?.money         || 0;
+  const banco     = u?.bank          || 0;
 
   let parejasStr = "Ninguna";
   if (u?.parejas?.length) {
@@ -67,7 +87,9 @@ export const run = async (contexto) => {
     infoHeader() +
     infoField("Personaje",    personaje) +
     infoField("Rango",        rango) +
-    infoField("Dinero",       `$${money}`) +
+    infoField("Cartera",      `$${cartera.toLocaleString()}`) +
+    infoField("Banco",        `$${banco.toLocaleString()}`) +
+    infoField("Total",        `$${(cartera + banco).toLocaleString()}`) +
     infoField("Mensajes",     mensajes) +
     infoField("Advertencias", `${advCount}/3`) +
     infoField("Parejas",      parejasStr) +

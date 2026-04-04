@@ -445,6 +445,20 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
       if (!comandos.has(command)) continue;
 
+      // ── 8.5 Verificación de Economía Activa ───────────────────────────
+      const ECO_CMDS = [
+        "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
+        "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
+        "extort", "recolectar", "impuestos", "cultivar", "cosechar", "plantar",
+        "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
+        "depositar", "retirar", "fianza"
+      ];
+
+      if (ECO_CMDS.includes(command) && isGroup && cfg && cfg.economyActive === false) {
+        await sock.sendMessage(from, { text: aviso("La economía está desactivada en este grupo. 🚫💰") }, { quoted: msg });
+        continue;
+      }
+
       const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
       const dbUser   = await User.findOne({ jid: sender }).select("permisos isJailed jailUntil").lean();
       const permisos = dbUser?.permisos ?? 0;

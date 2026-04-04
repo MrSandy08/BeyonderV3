@@ -38,11 +38,10 @@ const UserSchema = new Schema(
       type:     String,
       required: true,
       trim:     true,
-      index:    true,
     },
     groupId: {
       type:     String,
-      required: true,
+      required: false, // Opcional para un sistema global
       trim:     true,
     },
     nombre: {
@@ -127,7 +126,6 @@ const UserSchema = new Schema(
       type:    String,
       default: null,
       trim:    true,
-      index:   true,
     },
     parejas: {
       type:    [String],

@@ -28,10 +28,10 @@ export const run = async (contexto) => {
     const sinP = await User.find({ groupId: from, personaje: null }).lean();
     if (!sinP.length) return reply(aviso("✅ ¡Todos en este grupo tienen personaje!"));
 
-    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗨𝘀𝘂𝗮𝗿𝗶𝗼𝘀 𝘀𝗶𝗻 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲 ⿻ ₊˚๑\n`;
+    let txt = header("Usuarios sin Personaje") + "\n";
     txt += listSection("𝓡ecién Llegados");
     sinP.forEach((u, i) => {
-      txt += listItem(`${i + 1}. @${numFromJid(u.jid)}`) + "\n";
+      txt += listItem(`@${numFromJid(u.jid)}`);
     });
     return reply(txt, sinP.map(u => u.jid));
   }
@@ -43,9 +43,9 @@ export const run = async (contexto) => {
     const lista = await Buscados.find({}).lean();
     if (!lista.length) return reply(aviso("No hay personajes pedidos actualmente."));
 
-    let txt = `\u200e \u200e \u200e  \u200e \u200e⤹ ⊹ ୨୧ 𝗣𝗲𝗿𝘀𝗼𝗻𝗮𝗷𝗲𝘀 𝗕𝘂𝘀𝗰𝗮𝗱𝗼𝘀 ⿻ ₊˚๑\n`;
+    let txt = header("Personajes Buscados") + "\n";
     txt += listSection("𝓟edidos");
-    lista.forEach((b, i) => { txt += listItem(`${i + 1}. *${b.personaje}*`) + "\n"; });
+    lista.forEach((b, i) => { txt += listItem(b.personaje); });
     return reply(txt);
   }
 
@@ -110,10 +110,11 @@ export const run = async (contexto) => {
     const todosGlobal = await User.find({ personaje: { $ne: null } }).sort({ personaje: 1 }).lean();
     if (!todosGlobal.length) return reply(aviso("No hay personajes registrados todavía."));
 
-    let txt = `📜 *LISTA GLOBAL DE PERSONAJES* 📜\n\n`;
+    let txt = header("Lista Global de Personajes") + "\n";
+    txt += listSection("𝓟ersonajes");
     
     todosGlobal.forEach((u, i) => {
-      txt += `• *${u.personaje}* — @${numFromJid(u.jid)}\n`;
+      txt += listItem(u.personaje, `@${numFromJid(u.jid)}`);
     });
 
     txt += `\n       𝄄   _Total: ${todosGlobal.length} personajes registrados._`;
@@ -130,7 +131,7 @@ export const run = async (contexto) => {
 
     if (!inactivos.length) return reply(aviso("✅ ¡Todos están activos! Sin inactivos."));
 
-    let txt = `\u200e \u200e \u200e  \u200e \u200e ⤹ ⊹ ୨୧ 𝗥𝗲𝗴𝗶𝘀𝘁𝗿𝗼 𝗱𝗲 𝗜𝗻𝗮𝗰𝘁𝗶𝘃𝗶𝗱𝗮𝗱 ⿻ ₊˚๑\n`;
+    let txt = header("Registro de Inactividad") + "\n";
     txt += listSection("𝓘nactivos");
     inactivos.forEach(u => {
       txt += listItem(u.personaje, inactividadIcon(u.lastMessage));

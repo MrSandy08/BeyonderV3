@@ -28,11 +28,10 @@ export const userTarget = async (contexto, User, returnFullInfo = false) => {
     const primerArg = args[0].replace(/@\d+/g, "").trim();
     if (primerArg) {
       const userPorPrimerArg = await User.findOne({
-        groupId: from,
         personaje: { $regex: new RegExp(`^${primerArg}$`, "i") }
       }).select("jid").lean();
       if (userPorPrimerArg) {
-        console.log(`[Target] PJ encontrado por primer arg: ${primerArg} -> ${userPorPrimerArg.jid} en ${from}`);
+        console.log(`[Target] PJ encontrado por primer arg: ${primerArg} -> ${userPorPrimerArg.jid}`);
         return returnFullInfo ? { jid: userPorPrimerArg.jid, source: "args" } : userPorPrimerArg.jid;
       }
     }
@@ -41,11 +40,10 @@ export const userTarget = async (contexto, User, returnFullInfo = false) => {
     const busquedaCompleta = args.join(" ").replace(/@\d+/g, "").trim();
     if (busquedaCompleta && busquedaCompleta !== primerArg) {
       const userConPj = await User.findOne({
-        groupId: from,
         personaje: { $regex: new RegExp(`^${busquedaCompleta}$`, "i") }
       }).select("jid").lean();
       if (userConPj) {
-        console.log(`[Target] PJ encontrado: ${busquedaCompleta} -> ${userConPj.jid} en ${from}`);
+        console.log(`[Target] PJ encontrado: ${busquedaCompleta} -> ${userConPj.jid}`);
         return returnFullInfo ? { jid: userConPj.jid, source: "args_full" } : userConPj.jid;
       }
     }

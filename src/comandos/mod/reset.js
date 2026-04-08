@@ -35,13 +35,13 @@ export const run = async (contexto) => {
   try {
     const update = esAdvs ? { advs: [] } : { notas: [] };
     const result = await User.findOneAndUpdate(
-      { jid: targetJid, groupId: from },
+      { jid: targetJid },
       { $set: update },
       { new: true }
     );
 
     if (!result) {
-      return reply(aviso("El usuario no tiene un perfil registrado en este grupo."));
+      return reply(aviso("El usuario no tiene un perfil registrado."));
     }
 
     await react("✅");

@@ -190,6 +190,44 @@ async def detect_gore_endpoint(file: UploadFile = File(...)):
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+@app.post("/detect/clip")
+async def detect_clip_endpoint(file: UploadFile = File(...)):
+    temp_path = f"temp_clip_{os.getpid()}.jpg"
+    try:
+        contents = await file.read()
+        if not contents:
+            return {"error": "Buffer vacío"}
+            
+        with open(temp_path, "wb") as f:
+            f.write(contents)
+        
+        # 1. Cargar imagen y normalizar
+        with Image.open(temp_path) as img:
+            img = img.convert("RGB")
+            image_input = preprocess(img).unsqueeze(0).to(device)
+
+        # 2. Etiquetas para clasificación semántica (Picardía + Contexto)
+        text_descriptions = [
+            "a photo of a dog", "a photo of a cat", "a meme", "an anime drawing",
+            "provocativo", "sugerente", "doble sentido", "pose sexual", "sexy", "hot", "ropa interior",
+            "a person smiling", "a landscape", "text only", "a sticker"
+        ]
+        text_tokens = clip.tokenize(text_descriptions).to(device)
+
+        with torch.no_grad():
+            logits_per_image, _ = model_clip(image_input, text_tokens)
+            probs = logits_per_image.softmax(dim=-1).cpu().numpy()[0]
+        
+        # Filtrar etiquetas con probabilidad > 15%
+        tags = [text_descriptions[i] for i, prob in enumerate(probs) if prob > 0.15]
+        
+        return {"tags": tags}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
 @app.post("/detect")
 async def detect_image(file: UploadFile = File(...)):
     # Mantener compatibilidad por si acaso, pero preferir endpoints específicos

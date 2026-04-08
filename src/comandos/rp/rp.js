@@ -18,14 +18,13 @@ const normNombre   = (n)   => n?.toLowerCase().normalize("NFD").replace(/[\u0300
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const run = async (contexto) => {
-  const { reply, react, sender, args, command, text, isMod, isOwner, isWAAdmin, mentionedJids, msg, cfg } = contexto;
+  const { reply, react, sender, args, command, text, isMod, isOwner, isWAAdmin, mentionedJids, msg, cfg, from, communityId } = contexto;
 
   // ══════════════════════════════════════════════
   //  !sinpersonaje — público
   // ══════════════════════════════════════════════
   if (command === "sinpersonaje") {
-    const { from } = contexto;
-    const sinP = await User.find({ groupId: from, personaje: null }).lean();
+    const sinP = await User.find({ communityId, personaje: null }).lean();
     if (!sinP.length) return reply(aviso("✅ ¡Todos en este grupo tienen personaje!"));
 
     let txt = header("Usuarios sin Personaje") + "\n";
@@ -53,11 +52,10 @@ export const run = async (contexto) => {
   //  !pedir [nombre] — público
   // ══════════════════════════════════════════════
   if (command === "pedir") {
-    const { from } = contexto;
     const nombre = text;
     if (!nombre) return reply(aviso("Escribe el nombre del personaje que buscas.\n       𝄄   _Ej: !pedir Itachi Uchiha_"));
 
-    const yaOcupado = await User.findOne({ personaje: new RegExp(`^${nombre}$`, "i") }).lean();
+    const yaOcupado = await User.findOne({ communityId, personaje: new RegExp(`^${nombre}$`, "i") }).lean();
     if (yaOcupado) return reply(aviso(`*"${nombre}"* ya está ocupado globalmente por @${numFromJid(yaOcupado.jid)}.`));
 
     const yaEnLista = await Buscados.findOne({ personaje: new RegExp(`^${nombre}$`, "i") }).lean();
@@ -72,12 +70,12 @@ export const run = async (contexto) => {
   //  !lista — público con subcomandos
   // ══════════════════════════════════════════════
   if (command === "lista") {
-    const { from, meta } = contexto;
+    const { meta } = contexto;
     const sub = args[0]?.toLowerCase();
 
     // Prioridad 1: Subcomando administrativo 'ban'
     if (sub === "ban") {
-      const baneados = await User.find({ isBanned: true }).lean();
+      const baneados = await User.find({ communityId, isBanned: true }).lean();
       if (!baneados.length) return reply(aviso("No hay usuarios baneados en la base de datos."));
 
       let txt = `🚫 *LISTA DE BANEADOS*\n\n`;
@@ -91,13 +89,14 @@ export const run = async (contexto) => {
     if (args.length > 0) {
       const query = text;
       const match = await User.findOne({ 
+        communityId,
         personaje: new RegExp(`^${query}$`, "i") 
       }).lean();
 
       if (!match) return reply(aviso(`No se encontró ningún personaje con el nombre *"${query}"*.`));
 
       return reply(
-        `👤 *DETALLES DEL PERSONAJE (GLOBAL)*\n\n` +
+        `👤 *DETALLES DEL PERSONAJE*\n\n` +
         `   - Nombre: *${match.personaje}*\n` +
         `   - Usuario: @${match.jid.split("@")[0]}\n` +
         `   - Última vez visto en: ${match.groupId.split("@")[0]}`,
@@ -107,10 +106,10 @@ export const run = async (contexto) => {
 
     // Prioridad 3: Lista general (sin argumentos)
     // Mostramos todos los personajes de la DB global en una sola lista principal
-    const todosGlobal = await User.find({ personaje: { $ne: null } }).sort({ personaje: 1 }).lean();
+    const todosGlobal = await User.find({ communityId, personaje: { $ne: null } }).sort({ personaje: 1 }).lean();
     if (!todosGlobal.length) return reply(aviso("No hay personajes registrados todavía."));
 
-    let txt = header("Lista Global de Personajes") + "\n";
+    let txt = header("Lista de Personajes") + "\n";
     txt += listSection("𝓟ersonajes");
     
     todosGlobal.forEach((u, i) => {
@@ -125,8 +124,7 @@ export const run = async (contexto) => {
   //  !inactivos — público
   // ══════════════════════════════════════════════
   if (command === "inactivos") {
-    const { from } = contexto;
-    const todos     = await User.find({ groupId: from, personaje: { $ne: null } }).lean();
+    const todos     = await User.find({ communityId, personaje: { $ne: null } }).lean();
     const inactivos = todos.filter(u => inactividadIcon(u.lastMessage) !== "");
 
     if (!inactivos.length) return reply(aviso("✅ ¡Todos están activos! Sin inactivos."));
@@ -145,7 +143,6 @@ export const run = async (contexto) => {
   //  cualquiera puede quitarse el suyo propio
   // ══════════════════════════════════════════════
   if (command === "rp" && args[0]?.toLowerCase() === "quitar") {
-    const { from } = contexto;
     const puedeOtros = isMod || isOwner;
     
     // Si es !rp quitar @user o !rp quitar Personaje, detectamos el objetivo
@@ -160,14 +157,14 @@ export const run = async (contexto) => {
     if (cfg?.lockRp && !isOwner)
       return reply(aviso("🔒 Los personajes están bloqueados. Solo el Owner puede modificarlos."));
 
-    const u = await User.findOne({ jid: objetivo }).lean();
+    const u = await User.findOne({ communityId, jid: objetivo }).lean();
     if (!u?.personaje)
-      return reply(aviso(`@${numFromJid(objetivo)} no tiene personaje asignado globalmente.`));
+      return reply(aviso(`@${numFromJid(objetivo)} no tiene personaje asignado en esta comunidad.`));
 
     const nombreAntes = u.personaje;
-    await User.findOneAndUpdate({ jid: objetivo }, { $set: { personaje: null } });
+    await User.findOneAndUpdate({ communityId, jid: objetivo }, { $set: { personaje: null } });
     await react("✅");
-    return reply(aviso(`*${nombreAntes}* fue removido globalmente de @${numFromJid(objetivo)}.`));
+    return reply(aviso(`*${nombreAntes}* fue removido de @${numFromJid(objetivo)}.`));
   }
 
   // ══════════════════════════════════════════════
@@ -181,7 +178,6 @@ export const run = async (contexto) => {
     return reply(aviso("🔒 Los personajes están bloqueados. Solo el Owner puede modificarlos."));
 
   // Objetivo: si hay mención o PJ asigna a ese, si no, al que lo usa
-  const { from } = contexto;
   const targetInfo = await userTarget(contexto, User, true);
   const objetivo   = targetInfo.jid;
   const source     = targetInfo.source;
@@ -207,17 +203,17 @@ export const run = async (contexto) => {
     );
   }
 
-  // Verificar duplicado GLOBALMENTE
+  // Verificar duplicado en la COMUNIDAD
   const dup = await User.findOne({
+    communityId,
     jid:       { $ne: objetivo },
     personaje: new RegExp(`^${nombre}$`, "i"),
   }).lean();
-  if (dup) return reply(aviso(`*"${nombre}"* ya pertenece a @${numFromJid(dup.jid)} (visto por última vez en ${dup.groupId.split("@")[0]}).`));
+  if (dup) return reply(aviso(`*"${nombre}"* ya pertenece a @${numFromJid(dup.jid)} en esta comunidad.`));
 
-  // Actualizar o crear registro globalmente
-  // Aunque actualizamos el JID, mantenemos el groupId de donde se asignó por última vez para referencia
+  // Actualizar o crear registro en la COMUNIDAD
   await User.updateOne(
-    { jid: objetivo },
+    { communityId, jid: objetivo },
     { $set: { personaje: nombre, lastPersoChange: new Date(), groupId: from } },
     { upsert: true }
   );

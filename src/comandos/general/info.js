@@ -13,18 +13,19 @@ export const onlyMod   = false;
 export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, from, sender, pushname } = contexto;
+  const { reply, from, sender, pushname, communityId } = contexto;
 
   const objetivo = await userTarget(contexto, User);
+  console.log(`[DEBUG INFO] Solicitando info para: ${objetivo} (sender: ${sender})`);
   
-  // ── Lógica Global (Unificado por JID) ──
-  // Como ya tenemos índice único por JID, findOne es suficiente.
-  let u = await User.findOne({ jid: objetivo }).lean();
+  // ── Lógica de Comunidad (Unificado por JID + CommunityId) ──
+  let u = await User.findOne({ jid: objetivo, communityId }).lean();
+  console.log(`[DEBUG INFO] Usuario encontrado en DB: ${u ? u.personaje : 'No existe'}`);
 
   // Si no existe, lo creamos (Autoreparación)
   if (!u) {
     u = await User.findOneAndUpdate(
-      { jid: objetivo },
+      { jid: objetivo, communityId },
       { 
         $setOnInsert: { 
           nombre: pushname || "Usuario",
@@ -67,7 +68,7 @@ export const run = async (contexto) => {
   if (parejas.length) {
     const nombres = await Promise.all(
       parejas.map(async (jid) => {
-        const p = await User.findOne({ jid }).select("personaje").lean();
+        const p = await User.findOne({ jid, communityId }).select("personaje").lean();
         return p?.personaje || numFromJid(jid);
       })
     );

@@ -12,7 +12,7 @@ export const onlyOwner = false;
 let activeGift = null;
 
 export const run = async (contexto) => {
-  const { reply, sender, isOwner, command, args } = contexto;
+  const { reply, sender, isOwner, command, args, communityId } = contexto;
 
   // Solo el Owner puede lanzar un regalo manualmente
   if (command === "claim" && args[0] === "lanzar" && isOwner) {
@@ -30,7 +30,7 @@ export const run = async (contexto) => {
       return reply(aviso("No hay ningún regalo activo en este momento. 🕸️"));
     }
 
-    const user = await User.findOne({ jid: sender });
+    const user = await User.findOne({ jid: sender, communityId });
     if (!user) return;
 
     const botin = activeGift.monto;

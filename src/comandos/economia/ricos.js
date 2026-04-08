@@ -11,11 +11,11 @@ export const onlyOwner = false;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply } = contexto;
+  const { reply, communityId } = contexto;
 
-  // Agregación de MongoDB para unificar por JID y sumar Cartera + Banco
-  // Priorizamos el nombre del personaje sobre el nombre de WhatsApp
+  // Agregación de MongoDB para unificar por JID en la comunidad actual
   const top10 = await User.aggregate([
+    { $match: { communityId } },
     {
       $group: {
         _id: "$jid",

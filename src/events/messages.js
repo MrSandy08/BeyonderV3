@@ -2,10 +2,15 @@
 import config  from "../config.js";
 import User    from "../database/models/User.js";
 import Config  from "../database/models/Config.js";
+import Affinity from "../database/models/Affinity.js";
+import CommunityState from "../database/models/CommunityState.js";
+import GroupSlang from "../database/models/GroupSlang.js";
+import { shouldRespondOrganically } from "../utils/socialFilter.js";
+import { getAiResponse, evaluateNickname, detectNicknameIntent } from "../services/iaService.js";
 import BanList from "../database/models/BanList.js";
 import { solicitudes } from "../store/solicitudes.js";
 import { searches } from "../store/searches.js";
-import { analyzeImage } from "../utils/detector.js";
+import { analyzeImage, analyzeWithClip } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
 import fs from "fs";
@@ -51,6 +56,8 @@ const userRequests = new Map(); // Para rastrear envíos masivos por usuario
 // ── AntiFlood en RAM ──────────────────────────────────────────────────────────
 // groupId:userId → [timestamps]
 const floodTracker = new Map();
+// from → [timestamps]
+const groupMessageTracker = new Map();
 const FLOOD_LIMIT  = 15;
 const FLOOD_WINDOW = 5000; // 5 segundos
 
@@ -60,6 +67,13 @@ setInterval(() => {
     const fresh = times.filter(t => t > cutoff);
     if (!fresh.length) floodTracker.delete(key);
     else floodTracker.set(key, fresh);
+  }
+  // Limpiar groupMessageTracker también (ventana de 10s)
+  const cutoff10 = Date.now() - 10000;
+  for (const [key, times] of groupMessageTracker) {
+    const fresh = times.filter(t => t > cutoff10);
+    if (!fresh.length) groupMessageTracker.delete(key);
+    else groupMessageTracker.set(key, fresh);
   }
 }, 10_000);
 
@@ -224,38 +238,129 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.imageMessage?.caption ||
         msg.message?.videoMessage?.caption || "";
 
-      const isCmd   = texto.startsWith(config.PREFIX);
-      const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, permisos: 3 }).lean());
-      const meta    = isGroup ? await getGroupMeta(sock, from) : null;
-      const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
-      const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
+      // ── 1.2 Procesamiento de Media (Visión Local) ──
+      let visualContext = "";
+      let isMorboso = false;
+      let visualTags = [];
+      if (msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.stickerMessage) {
+        try {
+          const buffer = await downloadMediaMessage(msg, "buffer", {}, { re_use: true });
+          
+          // 1. Escaneo NSFW/Gore
+          const scan = await analyzeImage(buffer);
+          if (scan.isNsfw || scan.isGore) {
+            const reason = scan.isNsfw ? "contenido obsceno" : "contenido violento";
+            // Beyonder se ofende y baja afinidad
+            await Affinity.updateOne({ jid: sender, communityId }, { $inc: { points: -5 } });
+            await CommunityState.updateOne({ communityId }, { $inc: { tension: 15 } });
+            
+            const { text: reaction } = await getAiResponse(sender, from, communityId, userName, `El usuario mandó ${reason}. Reacciona con asco o enojo.`, [], true);
+            if (reaction) await sock.sendMessage(from, { text: reaction }, { quoted: msg });
+            if (scan.immediateDelete) await sock.sendMessage(from, { delete: msg.key });
+          } else {
+            // 2. Análisis CLIP para contexto y morbo
+            const clipResult = await analyzeWithClip(buffer);
+            if (clipResult.tags.length > 0) {
+              isMorboso = clipResult.isSuggestive;
+              visualTags = clipResult.tags;
+              visualContext = `[El usuario envió una imagen/sticker que contiene: ${clipResult.tags.join(", ")}${isMorboso ? ". CONTEXTO: Es un contenido sugerente/morboso." : ""}]`;
+              console.log(`[VISIÓN] Detectado: ${clipResult.tags.join(", ")} | Morbo: ${isMorboso}`);
+            }
+          }
+        } catch (e) {
+          console.error("❌ Error en Procesamiento de Visión:", e.message);
+        }
+      }
 
-      // ── 1. PRIORIDAD: Contador de Mensajes y Autoreparación (GLOBAL) ──
-      // Usamos findOneAndUpdate con upsert para evitar E11000 y reparar perfiles
-      const dbUser = await User.findOneAndUpdate(
-        { jid: sender },
-        { 
-          $setOnInsert: { 
-            nombre: userName,
-            personaje: null,
-            money: 0,
-            bank: 0,
-            msgCount: 0,
-            permisos: 0,
-            lastDaily: new Date(0)
+      // Concatenar contexto visual al texto si existe
+      const textoFinal = visualContext ? `${visualContext} ${texto}` : texto;
+
+      // ── 1.4 Recolección de Jerga (Mimetismo) ──
+      if (isGroup && texto.length > 3 && !isCmd) {
+        const words = texto.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        for (const word of words) {
+          if (Math.random() > 0.7) { // Muestreo aleatorio para no saturar DB
+            await GroupSlang.findOneAndUpdate(
+              { communityId, word },
+              { $inc: { count: 1 }, $set: { lastUsed: new Date() } },
+              { upsert: true }
+            ).catch(() => {});
+          }
+        }
+      }
+      const isCmd   = textoFinal.startsWith(config.PREFIX);
+        const meta    = isGroup ? await getGroupMeta(sock, from) : null;
+        const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
+
+        // ── Detección Automática de Comunidad ──
+        const communityId = meta?.linkedParent || cfg?.communityId || (isGroup ? from : "private");
+
+        const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, communityId, permisos: 3 }).lean());
+        const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
+
+        // ── 1. PRIORIDAD: Contador de Mensajes, Afinidad y Autoreparación ──
+        const dbUser = await User.findOneAndUpdate(
+          { jid: sender, communityId: communityId },
+          { 
+            $setOnInsert: { 
+              nombre: userName,
+              personaje: null,
+              money: 0,
+              bank: 0,
+              msgCount: 0,
+              permisos: 0,
+              lastDaily: new Date(0)
+            },
+            $set: { 
+              lastMessage: new Date(), 
+              groupId: groupJid,
+              nombre: userName 
+            }, 
+            $inc: { msgCount: 1 } 
           },
-          $set: { 
-            lastMessage: new Date(), 
-            groupId: groupJid,
-            nombre: userName 
-          }, 
-          $inc: { msgCount: 1 } 
-        },
-        { upsert: true, new: true, lean: true }
-      ).catch(e => {
-        console.error("❌ Error DB Contador:", e.message);
-        return null;
-      });
+          { upsert: true, new: true, lean: true }
+        ).catch(e => {
+          console.error("❌ Error DB Contador:", e.message);
+          return null;
+        });
+
+        // Actualizar Afinidad e Interacciones
+        await Affinity.findOneAndUpdate(
+          { jid: sender, communityId },
+          { 
+            $inc: { points: 0.1, interactions: 1 }, 
+            $set: { lastInteraction: new Date() } 
+          },
+          { upsert: true }
+        );
+
+        // ── 1.1. Monitoreo de Tensión y "Peleas" ──
+        if (isGroup) {
+          let state = await CommunityState.findOne({ communityId });
+          if (!state) state = await CommunityState.create({ communityId });
+
+          // Detección de gritos (Mayúsculas)
+          const isShouting = textoFinal.length > 5 && textoFinal === textoFinal.toUpperCase() && /[A-Z]/.test(textoFinal);
+          if (isShouting) {
+            await CommunityState.updateOne({ communityId }, { $inc: { tension: 2 } });
+          }
+          
+          // Actualizar última actividad
+          await CommunityState.updateOne({ communityId }, { $set: { lastActivity: new Date() } });
+        }
+
+        // ── 1.3 Gestión de Promesas (Recordatorios) ──
+        if (isCmd) {
+          // Si el bot detecta que hizo una promesa en su respuesta (esto se procesará después)
+          // Pero aquí podemos revisar si hay promesas pendientes para este usuario
+          const core = await BeyonderCore.findOne();
+          if (core?.promises?.length > 0) {
+            const miPromesa = core.promises.find(p => p.jid === sender && p.communityId === communityId && !p.completed);
+            if (miPromesa) {
+              visualContext += ` [RECORDATORIO: Tienes una promesa pendiente con este usuario: "${miPromesa.content}"]`;
+            }
+          }
+        }
 
       // ── 2.5 Spawn de Regalo Aleatorio (!claim) ──
       const economyOn = isGroup && cfg && cfg.economyActive !== false;
@@ -372,7 +477,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
           if (detectadoLinkLink || detectadoLinkPorn) {
             const adminWA = isWAAdmin(meta, sender);
-            const dbUser  = await User.findOne({ jid: sender, groupId: groupJid }).select("permisos").lean();
+            const dbUser  = await User.findOne({ jid: sender, communityId }).select("permisos").lean();
             
             if (!adminWA && (dbUser?.permisos ?? 0) < 2) {
               await sock.sendMessage(from, { react: { text: "💀", key: msg.key } }).catch(() => {});
@@ -380,7 +485,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               
               const tipoStr = detectadoLinkLink ? "Enlace de Grupo" : "Enlace Prohibido/NSFW";
               const actualizado = await User.findOneAndUpdate(
-                { jid: sender },
+                { jid: sender, communityId },
                 { 
                   $push: { advs: { contenido: `Link prohibido (${tipoStr})`, autor: "SISTEMA", fecha: new Date() } },
                   $set: { groupId: groupJid }
@@ -409,24 +514,69 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
       const isMentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botId);
       const isReplyToBot = msg.message?.extendedTextMessage?.contextInfo?.participant === botId;
-      const saysBeyonder = /beyonder|beyond/i.test(texto);
 
-      // Solo disparar si el grupo está marcado como 'Principal'
-      const canTriggerIA = cfg?.esPrincipal;
+      // ── 1.5 Filtro de Relevancia Social (¿Debería hablar?) ──
+      const isMencionDirecta = isMentioned || isReplyToBot;
 
-      if (!isCmd && canTriggerIA) {
-        let shouldRespond = false;
-        let forced = false;
+      // Track group speed
+      const groupTimes = (groupMessageTracker.get(from) || []).filter(t => Date.now() - t < 10000);
+      groupTimes.push(Date.now());
+      groupMessageTracker.set(from, groupTimes);
+      const isConversationFast = groupTimes.length > 5;
 
-        if (isReplyToBot) {
-          shouldRespond = true; // 100% si es respuesta directa al bot
-          forced = true;
-        } else if (isMentioned || saysBeyonder) {
-          // Probabilidad del 25% para menciones o palabras clave
-          shouldRespond = Math.random() < 0.25;
+      // ── 1.6 Módulo de Escucha Pasiva de Identidad ──
+      const nicknameKeywords = ["dime", "llámame", "apodo", "soy", "llámame", "decir"];
+      if (!isCmd && (isMencionDirecta || nicknameKeywords.some(k => texto.toLowerCase().includes(k)))) {
+        const proposedNick = await detectNicknameIntent(texto);
+        
+        if (proposedNick) {
+          const aff = await Affinity.findOne({ jid: sender, communityId }).lean();
+          const { accepted, reason } = await evaluateNickname(sender, communityId, userName, proposedNick, aff?.points || 0, visualTags, isMorboso);
+          
+          // Actualizar Affinity
+          await Affinity.updateOne(
+            { jid: sender, communityId },
+            { 
+              $set: { 
+                "nickname.proposed": proposedNick,
+                "nickname.accepted": accepted,
+                "nickname.final": accepted ? proposedNick : null,
+                "nickname.rejectionReason": accepted ? null : reason
+              } 
+            }
+          );
+
+          // Actualizar User (Identidad Dinámica)
+          if (accepted) {
+            await User.updateOne(
+              { jid: sender, communityId },
+              { 
+                $set: { "identidad.apodo_actual": proposedNick },
+                $addToSet: { "identidad.historial_apodos": proposedNick }
+              }
+            );
+          } else {
+            await User.updateOne(
+              { jid: sender, communityId },
+              { $addToSet: { "identidad.apodos_rechazados": proposedNick } }
+            );
+          }
+          
+          // Regla de Saliencia: Si la charla está rápida, guarda en silencio.
+          // Si está tranquila o es mención directa, responde.
+          if (!isConversationFast || isMencionDirecta) {
+            await sock.sendMessage(from, { text: reason }, { quoted: msg });
+            continue; // No procesar más este mensaje si ya respondimos sobre el apodo
+          }
         }
+      }
 
-        if (shouldRespond) {
+      const debeHablar = !isCmd && cfg?.esPrincipal && await shouldRespondOrganically({
+        sender, communityId, isGroup, isMencionDirecta, isMorboso, texto, visualTags
+      });
+
+      if (debeHablar) {
+          let forced = isReplyToBot;
           await sock.sendPresenceUpdate('composing', from).catch(() => {});
           
           // Simular delay natural
@@ -434,21 +584,60 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           await new Promise(resolve => setTimeout(resolve, delay));
 
           const history = chatHistories.get(from) || [];
-          const { text: aiText, action } = await getAiResponse(sender, from, userName, texto, history, forced);
+          const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+          const { text: aiText, action } = await getAiResponse(sender, from, communityId, userName, textoFinal, history, forced, mentionedJids);
           
           if (aiText) {
+              // Extraer menciones de la respuesta de la IA (JIDs que empiecen con @)
+              const extraMentions = aiText.match(/@\d+(@s\.whatsapp\.net)?/g) || [];
+              const finalMentions = [...new Set([...mentionedJids, ...extraMentions.map(m => m.replace("@", "") + (m.includes("@") ? "" : "@s.whatsapp.net"))])];
+
+              // ── Procesar Acciones (Bautizo) ──
+              if (action?.type === "BAUTIZO") {
+                await Affinity.updateOne({ jid: sender, communityId }, { $set: { "nickname.accepted": true, "nickname.final": action.nickname } });
+                await User.updateOne({ jid: sender, communityId }, { $set: { "identidad.apodo_actual": action.nickname }, $addToSet: { "identidad.historial_apodos": action.nickname } });
+              }
+
+              // ── Gestión de Promesas (Detectar intenciones) ──
+              if (aiText.toLowerCase().includes("prometo") || aiText.toLowerCase().includes("mañana te") || aiText.toLowerCase().includes("luego te")) {
+                await BeyonderCore.updateOne({}, {
+                  $push: {
+                    promises: {
+                      jid: sender,
+                      communityId,
+                      content: aiText.substring(0, 100),
+                      dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                    }
+                  }
+                });
+              }
+
+              // ── Simulación de Escritura Humana y Fragmentación ──
+            const fragments = aiText.split("\n\n").filter(f => f.trim().length > 0);
+            
+            for (const part of fragments) {
+              // Calcular delay basado en longitud (promedio 10 chars/seg)
+              const typingTime = Math.min(Math.max(part.length * 50, 1500), 5000);
+              
+              await sock.sendPresenceUpdate("composing", from).catch(() => {});
+              await new Promise(res => setTimeout(res, typingTime));
+              
+              await sock.sendMessage(from, { text: part.trim(), mentions: finalMentions }, { quoted: msg }).catch(() => {});
+              
+              // Pequeña pausa entre fragmentos
+              if (fragments.length > 1) await new Promise(res => setTimeout(res, 1000));
+            }
+
             // Guardar en historial
             history.push({ role: "user", content: texto });
             history.push({ role: "assistant", content: aiText });
             if (history.length > 30) history.splice(0, 2); 
             chatHistories.set(from, history);
 
-            await sock.sendMessage(from, { text: aiText }, { quoted: msg });
             await sock.sendPresenceUpdate('paused', from).catch(() => {});
           }
           continue;
         }
-      }
 
       // ── 8. Manejo de Comandos ──────────────────────────────────────────
       if (!isCmd) {
@@ -500,7 +689,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           }
         } else {
           // Si el tiempo expiró, liberar automáticamente
-          await User.updateOne({ jid: sender }, { $set: { isJailed: false, jailUntil: null } });
+          await User.updateOne({ jid: sender, communityId }, { $set: { isJailed: false, jailUntil: null } });
         }
       }
 
@@ -524,6 +713,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       const contexto = {
         msg, sock, sender, from, args, isGroup, command, text,
         remoteJid: from,
+        communityId,
         isWAAdmin:  isAdmin,
         isMod:      userIsMod,
         isOwner:    isOwner,
@@ -531,7 +721,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         cfg:        cfg || {},
         meta,
         config,
-        mentionedJids: msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [],
+        mentionedJids: msg.message?.[mtype]?.contextInfo?.mentionedJid ?? [],
         reply:  async (text, mentions = []) => {
           for (let i = 0; i < 3; i++) {
             try {
@@ -643,7 +833,7 @@ async function procesarMediaBackground(sock, msg, from, sender, cfg, meta, userN
 
         if (isNSFW || isGore) {
           const prob = result.score ? (result.score * 100).toFixed(1) : "??";
-          const userInDB = await User.findOne({ jid: sender, groupId: from }).lean();
+          const userInDB = await User.findOne({ jid: sender, communityId: cfg.communityId || from }).lean();
           const fullIdentity = userInDB?.personaje || userInDB?.nombre || userName;
           const tipoStr = result.type;
 

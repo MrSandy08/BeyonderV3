@@ -211,7 +211,7 @@ export const onlyMod   = false;
 export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, react, sender, from, sock, msg, args } = contexto;
+  const { reply, react, sender, from, sock, msg, args, communityId } = contexto;
 
   const rawBody = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || "").trim().toLowerCase().split(/\s+/)[0].slice(1);
   const accion = ACCIONES[rawBody];
@@ -223,8 +223,8 @@ export const run = async (contexto) => {
   let nombreYo     = `@${numFromJid(sender)}`;
   let nombreTarget = (targetJid === sender && !targetEspecificado) ? "sí mismo" : `@${numFromJid(targetJid)}`;
 
-  const dbYo     = await User.findOne({ jid: sender, groupId: from }).select("personaje").lean();
-  const dbTarget = (targetJid === sender && !targetEspecificado) ? null : await User.findOne({ jid: targetJid, groupId: from }).select("personaje").lean();
+  const dbYo     = await User.findOne({ jid: sender, communityId }).select("personaje").lean();
+  const dbTarget = (targetJid === sender && !targetEspecificado) ? null : await User.findOne({ jid: targetJid, communityId }).select("personaje").lean();
 
   if (dbYo?.personaje)     nombreYo     = primerNombre(dbYo.personaje);
   if (dbTarget?.personaje) nombreTarget = primerNombre(dbTarget.personaje);

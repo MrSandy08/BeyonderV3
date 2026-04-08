@@ -5,12 +5,43 @@
 import axios from 'axios';
 import FormData from 'form-data';
 
-// ── CONFIGURACIÓN INTERNA (HUGGING FACE) ─────────────────────────────────────
+// ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
 const AI_SERVER_URL = `http://127.0.0.1:7860/detect`;
 const AI_NSFW_URL   = `http://127.0.0.1:7860/detect/nsfw`;
 const AI_GORE_URL   = `http://127.0.0.1:7860/detect/gore`;
+const AI_CLIP_URL   = `http://127.0.0.1:7860/detect/clip`; // Nueva ruta para CLIP puro
 
-// ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
+// ... (NSFW_THRESHOLDS same)
+
+/**
+ * Analiza una imagen con CLIP para obtener etiquetas descriptivas.
+ * También identifica si el contenido es "morboso" o sugerente.
+ */
+export async function analyzeWithClip(buffer) {
+  try {
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'image.jpg' });
+
+    const response = await axios.post(AI_CLIP_URL, form, {
+      headers: { ...form.getHeaders() },
+      timeout: 15000 
+    });
+
+    const tags = response.data.tags || [];
+    
+    // Lógica de detección de morbo (Picardía)
+    const suggestiveTags = ["provocativo", "sugerente", "doble sentido", "pose sexual", "sexy", "hot", "ropa interior"];
+    const isSuggestive = tags.some(tag => suggestiveTags.includes(tag.toLowerCase()));
+
+    return {
+      tags,
+      isSuggestive
+    };
+  } catch (error) {
+    console.error("❌ Error analyzeWithClip:", error.message);
+    return { tags: [], isSuggestive: false };
+  }
+}DE UMBRALES (NudeNet) ──────────────────────────────────────
 const NSFW_THRESHOLDS = {
   'FEMALE_GENITALIA_EXPOSED': 0.30,
   'MALE_GENITALIA_EXPOSED':   0.30,

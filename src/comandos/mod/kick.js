@@ -12,15 +12,15 @@ export const onlyOwner = false;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, sender, from, sock } = contexto;
+  const { reply, react, sender, from, sock, communityId } = contexto;
 
   const objetivo = await userTarget(contexto, User);
   if (!objetivo || objetivo === sender) return reply(aviso("Menciona al usuario o escribe su personaje que quieres expulsar.\n       𝄄   _Uso: !kick @usuario_"));
 
-  const dbGlobal = await User.findOne({ jid: objetivo, permisos: 3 }).select("permisos").lean();
+  const dbGlobal = await User.findOne({ jid: objetivo, communityId, permisos: 3 }).select("permisos").lean();
   if (dbGlobal?.permisos === 3) { await react("🚫"); return reply(aviso("No puedes expulsar a un *Owner*.")); }
 
-  const dbLocal = await User.findOne({ jid: objetivo, groupId: from }).select("personaje").lean();
+  const dbLocal = await User.findOne({ jid: objetivo, communityId }).select("personaje").lean();
 
   try {
     await sock.groupParticipantsUpdate(from, [objetivo], "remove");

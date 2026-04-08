@@ -12,10 +12,10 @@ export const onlyOwner = true;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, sock, from } = contexto;
+  const { reply, react, sock, from, sender, communityId } = contexto;
 
   const objetivo = await userTarget(contexto, User);
-  if (!objetivo || objetivo === contexto.sender) return reply(aviso("Menciona al usuario o escribe su personaje que quieres hacer Mod.\n       𝄄   _Uso: !mod @usuario_"));
+  if (!objetivo || objetivo === sender) return reply(aviso("Menciona al usuario o escribe su personaje que quieres hacer Mod.\n       𝄄   _Uso: !mod @usuario_"));
 
   let esAdminWA = false;
   try {
@@ -27,17 +27,18 @@ export const run = async (contexto) => {
   if (!esAdminWA)
     return reply(aviso(`@${numFromJid(objetivo)} no es admin del grupo. Solo los admins de WhatsApp pueden ser Moderadores.`), [objetivo]);
 
-  const antes = await User.findOne({ jid: objetivo, groupId: from }).select("permisos personaje").lean();
+  const antes = await User.findOne({ jid: objetivo, communityId }).select("permisos personaje").lean();
   
   // Verificar si es Owner global
   const isGlobalOwner = contexto.config.OWNERS.includes(objetivo) || 
-                        (await User.findOne({ jid: objetivo, permisos: 3 }).lean());
+                        (await User.findOne({ jid: objetivo, communityId, permisos: 3 }).lean());
 
   if (isGlobalOwner) return reply(aviso("No puedes cambiar el rango de un Owner."));
   
-  if (antes?.permisos === 2) return reply(aviso(`@${numFromJid(objetivo)} ya es Moderador en este grupo.`), [objetivo]);
+  if (antes?.permisos === 2) return reply(aviso(`*@${numFromJid(objetivo)}* ya es Moderador.`), [objetivo]);
 
-  await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { permisos: 2 } }, { upsert: true });
+  // Se registra como mod globalmente
+  await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { permisos: 2, groupId: from } }, { upsert: true });
   
   // Dar admin en WhatsApp
   await sock.groupParticipantsUpdate(from, [objetivo], "promote").catch(() => {});

@@ -109,7 +109,7 @@ const TIERS = [
 ];
 
 export const run = async (contexto) => {
-  const { reply, sender, from, args, sock, msg, mentionedJids } = contexto;
+  const { reply, sender, from, args, sock, msg, mentionedJids, communityId } = contexto;
 
   // Detectar objetivos
   let u1 = sender;
@@ -138,8 +138,8 @@ export const run = async (contexto) => {
   const tier = TIERS.find(t => porcentaje >= t.min && porcentaje <= t.max);
 
   // Obtener nombres
-  const db1 = await User.findOne({ jid: u1, groupId: from }).select("personaje").lean();
-  const db2 = await User.findOne({ jid: u2, groupId: from }).select("personaje").lean();
+  const db1 = await User.findOne({ jid: u1, communityId }).select("personaje").lean();
+  const db2 = await User.findOne({ jid: u2, communityId }).select("personaje").lean();
 
   const n1 = db1?.personaje || `@${u1.split("@")[0]}`;
   const n2 = db2?.personaje || `@${u2.split("@")[0]}`;

@@ -9,9 +9,9 @@ export const onlyMod   = false;
 export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, sender, react } = contexto;
+  const { reply, sender, communityId } = contexto;
 
-  const user = await User.findOne({ jid: sender });
+  const user = await User.findOne({ jid: sender, communityId });
   if (!user) return;
 
   if (!user.isJailed) {

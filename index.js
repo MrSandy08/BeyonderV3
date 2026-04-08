@@ -14,6 +14,8 @@ import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
 import cargarComandos from "./src/handlers/commandHandler.js";
 import handleMessages from "./src/events/messages.js";
+import { handleGroupParticipantsUpdate, handleGroupUpdate } from "./src/events/groupUpdate.js";
+import { checkGroupInactivity } from "./src/services/initiativeService.js";
 
 const { MONGO_URI, PORT, PHONE_NUMBER, OWNERS } = config;
 
@@ -102,13 +104,17 @@ const conectarWhatsApp = async (comandos) => {
         if (debeReconectar) {
           const delay = 5000;
           console.log(`🔄 Reconectando en ${delay/1000}s...`);
-          // Limpiar client si existe para forzar nueva conexión
-          if (mongoClient && codigo === DisconnectReason.connectionLost) {
-            console.log("⚠️ Conexión perdida, reintentando con nuevo cliente...");
-          }
           setTimeout(() => conectarWhatsApp(comandos), delay);
         } else {
-          console.log("🚪 Sesión cerrada permanentemente (Logged Out).");
+          console.log("🚪 Sesión cerrada (Logged Out). Limpiando datos de autenticación...");
+          try {
+            // Como usamos MongoDB para auth, borramos la colección 'auth'
+            await collection.deleteMany({});
+            console.log("✅ Datos de sesión borrados. Reiniciando bot para generar nuevo acceso...");
+            setTimeout(() => conectarWhatsApp(comandos), 2000);
+          } catch (e) {
+            console.error("❌ Error al limpiar sesión en MongoDB:", e.message);
+          }
         }
       }
     });
@@ -120,67 +126,17 @@ const conectarWhatsApp = async (comandos) => {
       handleMessages(upsert, sock, comandos)
     );
 
-    // ── Gestión de Salida de Usuarios (Limpieza de Datos) ──────────────────
-    sock.ev.on("group-participants.update", async (update) => {
-      const { id, participants, action } = update;
-      
-      if (action === "remove") {
-        for (const jid of participants) {
-          console.log(`[LIMPIEZA] Usuario ${jid} salió del grupo ${id}. Limpiando datos...`);
-          
-          try {
-            // 1. Obtener datos del usuario antes de limpiar para romper vínculos
-            const user = await User.findOne({ jid, groupId: id });
-            if (!user) continue;
+    // ── Gestión de Eventos de Grupo ──────────────────────────────────────────
+    sock.ev.on("group-participants.update", (update) => 
+      handleGroupParticipantsUpdate(update, sock)
+    );
 
-            // 2. Romper vínculos de pareja (Poliamor/Pareja)
-            if (user.parejas && user.parejas.length > 0) {
-              for (const pJid of user.parejas) {
-                await User.findOneAndUpdate(
-                  { jid: pJid, groupId: id },
-                  { $pull: { parejas: jid } }
-                );
-              }
-            }
+    sock.ev.on("groups.update", (updates) => 
+      handleGroupUpdate(updates, sock)
+    );
 
-            // 3. Romper vínculos de parentesco (Hijos)
-            if (user.kinship?.children && user.kinship.children.length > 0) {
-              for (const cJid of user.kinship.children) {
-                await User.findOneAndUpdate(
-                  { jid: cJid, groupId: id },
-                  { $set: { "kinship.parent": null } }
-                );
-              }
-            }
-
-            // 4. Romper vínculo con el padre
-            if (user.kinship?.parent) {
-              await User.findOneAndUpdate(
-                { jid: user.kinship.parent, groupId: id },
-                { $pull: { "kinship.children": jid } }
-              );
-            }
-
-            // 5. Limpiar personaje y resetear vínculos del usuario que salió
-            await User.findOneAndUpdate(
-              { jid, groupId: id },
-              { 
-                $set: { 
-                  personaje: null,
-                  parejas: [],
-                  "kinship.parent": null,
-                  "kinship.children": []
-                } 
-              }
-            );
-            
-            console.log(`✅ Datos de ${jid} limpiados correctamente.`);
-          } catch (err) {
-            console.error(`❌ Error en limpieza de datos para ${jid}:`, err.message);
-          }
-        }
-      }
-    });
+    // ── 3. SISTEMA DE INICIATIVA (Cada 1 hora) ───────────────────────────────
+    setInterval(() => checkGroupInactivity(sock), 60 * 60 * 1000);
 
     return sock;
   } catch (err) {

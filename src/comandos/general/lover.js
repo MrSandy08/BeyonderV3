@@ -12,14 +12,14 @@ const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 
 export const run = async (contexto) => {
-  const { reply, sender, from } = contexto;
+  const { reply, sender, from, communityId } = contexto;
 
-  const usuario = await User.findOne({ jid: sender, groupId: from }).lean();
+  const usuario = await User.findOne({ jid: sender, communityId }).lean();
   if (!usuario?.parejas?.length)
-    return reply(aviso("No tienes pareja actualmente en este grupo. 💔\n       𝄄   _¿Quizás alguien espera una propuesta tuya?_ 🌸"));
+    return reply(aviso("No tienes ninguna pareja registrada globalmente. 💔\n       𝄄   _¿Quizás alguien espera una propuesta tuya?_ 🌸"));
 
   const infoParejas = await Promise.all(usuario.parejas.map(async jid => {
-    const u = await User.findOne({ jid, groupId: from }).lean();
+    const u = await User.findOne({ jid, communityId }).lean();
     return { jid, nombre: u?.personaje || numFromJid(jid) };
   }));
 

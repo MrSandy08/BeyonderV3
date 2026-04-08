@@ -16,7 +16,7 @@ const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 const EXPIRA_MS    = 30 * 60 * 1000;
 
 export const run = async (contexto) => {
-  const { reply, sender, from, sock, msg, args } = contexto;
+  const { reply, sender, from, sock, msg, args, communityId } = contexto;
 
   // Detectar objetivos: menciones o personaje (solo el primer personaje si hay varios args)
   let targets = (contexto.mentionedJids || []).filter(j => j !== sender);
@@ -30,34 +30,34 @@ export const run = async (contexto) => {
 
   if (!targets.length) return reply(aviso("Menciona a quien quieres proponer o escribe su personaje.\n       𝄄   _!marry @usuario_ o _!marry Personaje_"));
 
-  const miUsuario = await User.findOne({ jid: sender, groupId: from }).lean();
-  if (!miUsuario?.personaje) return reply(aviso("Necesitas tener un *personaje* asignado en este grupo para proponer."));
+  const miUsuario = await User.findOne({ jid: sender, communityId }).lean();
+  if (!miUsuario?.personaje) return reply(aviso("Necesitas tener un *personaje* asignado globalmente para proponer."));
 
   if (miUsuario.parejas?.length > 0 && targets.length === 1) {
     const nombres = await Promise.all(miUsuario.parejas.map(async id => {
-      const u = await User.findOne({ jid: id, groupId: from }).lean();
+      const u = await User.findOne({ jid: id, communityId }).lean();
       return `*${primerNombre(u?.personaje || numFromJid(id))}*`;
     }));
-    return reply(aviso(`Ya tienes pareja con ${nombres.join(", ")} en este grupo.\n       𝄄   _Para poliamor, menciona a *todos* en una sola propuesta._`));
+    return reply(aviso(`Ya tienes pareja con ${nombres.join(", ")} globalmente.\n       𝄄   _Para poliamor, menciona a *todos* en una sola propuesta._`));
   }
 
   const targetsValidos = [];
   for (const tId of targets) {
-    const uT = await User.findOne({ jid: tId, groupId: from }).lean();
-    if (!uT?.personaje) { await sock.sendMessage(from, { text: aviso(`@${numFromJid(tId)} no tiene personaje asignado en este grupo.`), mentions: [tId] }, { quoted: msg }); continue; }
-    if (uT.parejas?.length > 0 && !targets.includes(uT.parejas[0])) { await sock.sendMessage(from, { text: aviso(`*${primerNombre(uT.personaje)}* ya tiene pareja en este grupo. 💔`), mentions: [tId] }, { quoted: msg }); continue; }
+    const uT = await User.findOne({ jid: tId, communityId }).lean();
+    if (!uT?.personaje) { await sock.sendMessage(from, { text: aviso(`@${numFromJid(tId)} no tiene personaje asignado globalmente.`), mentions: [tId] }, { quoted: msg }); continue; }
+    if (uT.parejas?.length > 0 && !targets.includes(uT.parejas[0])) { await sock.sendMessage(from, { text: aviso(`*${primerNombre(uT.personaje)}* ya tiene pareja globalmente. 💔`), mentions: [tId] }, { quoted: msg }); continue; }
     
     // VALIDACIÓN DE INCESTO (Adopción / Kinship)
     // 1. ¿Es su hijo/descendiente?
-    const esDescendiente = await isAncestor(sender, tId, from);
+    const esDescendiente = await isAncestor(sender, tId, communityId);
     if (esDescendiente) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con un descendiente! *${primerNombre(uT.personaje)}* es de tu linaje.`), mentions: [tId] }, { quoted: msg }); continue; }
     
     // 2. ¿Es su padre/antecesor?
-    const esAncestro = await isAncestor(tId, sender, from);
+    const esAncestro = await isAncestor(tId, sender, communityId);
     if (esAncestro) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con un antecesor! *${primerNombre(uT.personaje)}* es parte de tu linaje directo.`), mentions: [tId] }, { quoted: msg }); continue; }
     
     // 3. ¿Son hermanos?
-    const sonHermanos = await areSiblings(sender, tId, from);
+    const sonHermanos = await areSiblings(sender, tId, communityId);
     if (sonHermanos) { await sock.sendMessage(from, { text: aviso(`¡No puedes casarte con tu hermano/a! Comparten el mismo origen.`), mentions: [tId] }, { quoted: msg }); continue; }
 
     targetsValidos.push(tId);
@@ -68,7 +68,7 @@ export const run = async (contexto) => {
   const miNombre     = primerNombre(miUsuario.personaje);
   const esPoliamor   = targetsValidos.length > 1 || miUsuario.parejas?.length > 0;
   const labelTargets = await Promise.all(targetsValidos.map(async id => {
-    const u = await User.findOne({ jid: id, groupId: from }).lean();
+    const u = await User.findOne({ jid: id, communityId }).lean();
     return `*${primerNombre(u?.personaje || numFromJid(id))}*`;
   }));
 

@@ -13,7 +13,7 @@ const NIVEL_LABELS = { 0: "👤 Miembro", 1: "⭐ Helper", 2: "🛡️ Moderador
 const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, args, msg, from, sock } = contexto;
+  const { reply, react, args, msg, from, sock, communityId } = contexto;
 
   const rawText = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || "").trim().toLowerCase();
   const isDegrada = rawText.startsWith("!degradar");
@@ -22,11 +22,11 @@ export const run = async (contexto) => {
 
   if (!objetivo) return reply(aviso("Menciona a un usuario o escribe su personaje.\n       𝄄   _!promover @user <nivel>_ o _!degradar @user_"));
 
-  const antes      = await User.findOne({ jid: objetivo, groupId: from }).select("permisos personaje nombre").lean();
+  const antes      = await User.findOne({ jid: objetivo, communityId }).select("permisos personaje nombre").lean();
   
   // Verificar si es Owner global (por .env o permisos: 3 en cualquier grupo)
   const isGlobalOwner = contexto.config.OWNERS.includes(objetivo) || 
-                        (await User.findOne({ jid: objetivo, permisos: 3 }).lean());
+                        (await User.findOne({ jid: objetivo, communityId, permisos: 3 }).lean());
 
   if (isGlobalOwner) return reply(aviso("No puedes modificar el rango de un Owner."));
 
@@ -53,7 +53,10 @@ export const run = async (contexto) => {
     }
   }
 
-  await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { permisos: nuevoNivel } }, { upsert: true });
+  if (nuevoNivel === nivelAntes) return reply(aviso(`*@${numFromJid(objetivo)}* ya es *${NIVEL_LABELS[nuevoNivel]}*.`), [objetivo]);
+
+  // Actualizar permisos globalmente
+  await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { permisos: nuevoNivel, groupId: from } }, { upsert: true });
 
   const nombre = antes?.personaje || antes?.nombre || `@${numFromJid(objetivo)}`;
   await react("✅");

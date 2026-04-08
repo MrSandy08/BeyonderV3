@@ -14,7 +14,7 @@ export const onlyOwner = false;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, args, msg, from } = contexto;
+  const { reply, react, args, msg, from, communityId } = contexto;
 
   const rawBody = (
     msg.message?.conversation ||
@@ -58,8 +58,8 @@ export const run = async (contexto) => {
   
   if (!objetivo) return reply(aviso(`Menciona al usuario o escribe su personaje con el *!quitar ${tipo}*.`));
 
-  const u = await User.findOne({ jid: objetivo, groupId: from }).lean();
-  if (!u) return reply(aviso(`@${numFromJid(objetivo)} no tiene datos registrados en este grupo.`), [objetivo]);
+  const u = await User.findOne({ jid: objetivo, communityId }).lean();
+  if (!u) return reply(aviso(`@${numFromJid(objetivo)} no tiene datos registrados.`), [objetivo]);
 
   if (tipo === "nota") {
     const notas = u.notas || [];
@@ -70,7 +70,7 @@ export const run = async (contexto) => {
     const nuevas = [...notas];
     const [eliminada] = nuevas.splice(n - 1, 1);
 
-    await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { notas: nuevas } });
+    await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { notas: nuevas } });
     await react("✅");
     return reply(
       aviso(`Nota *#${n}* eliminada de @${numFromJid(objetivo)}.\n       𝄄   _"${eliminada.contenido}"_`),
@@ -86,7 +86,7 @@ export const run = async (contexto) => {
     const nuevas = [...advs];
     const [eliminada] = nuevas.splice(n - 1, 1);
 
-    await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { advs: nuevas } });
+    await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { advs: nuevas } });
     await react("✅");
     return reply(
       aviso(`Advertencia *#${n}* eliminada de @${numFromJid(objetivo)}.\n       𝄄   _"${eliminada.contenido}"_\n       𝄄   📊 Advs restantes: *${nuevas.length}/3*`),

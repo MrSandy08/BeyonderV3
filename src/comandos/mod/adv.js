@@ -14,7 +14,7 @@ const MAX_ADV    = 3;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, sender, from, args, mentionedJids, isWAAdmin, isMod, isOwner, sock, msg } = contexto;
+  const { reply, react, sender, from, args, mentionedJids, isWAAdmin, isMod, isOwner, sock, msg, communityId } = contexto;
 
   const rawBody = (
     msg.message?.conversation ||
@@ -26,11 +26,11 @@ export const run = async (contexto) => {
   // ── !veradv [@user] — cualquiera puede ver ────────────────────────────────
   if (esVer) {
     const objetivo = await userTarget(contexto, User);
-    const u        = await User.findOne({ jid: objetivo, groupId: from }).lean();
+    const u        = await User.findOne({ jid: objetivo, communityId }).lean();
     const nombre   = u?.personaje || numFromJid(objetivo);
 
     if (!u?.advs?.length)
-      return reply(aviso(`✅ *${nombre}* no tiene advertencias activas en este grupo.`));
+      return reply(aviso(`*${nombre}* no tiene advertencias.`));
 
     let txt = `\u200e \u200e \u200e  \u200e \u200e ⤹ ⊹ ୨୧ 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 ⿻ ₊˚๑\n`;
     txt +=`                     𝄄 𓈒   ⁺ *${nombre}*   𓏼\n\n`;
@@ -53,7 +53,7 @@ export const run = async (contexto) => {
 
   if (!objetivo || objetivo === sender) return reply(aviso("Menciona al usuario o escribe su personaje.\n       𝄄   _Uso: !adv @usuario [motivo]_"));
 
-  const dbObj = await User.findOne({ jid: objetivo, groupId: from }).select("permisos").lean();
+  const dbObj = await User.findOne({ jid: objetivo, communityId }).select("permisos").lean();
   if (dbObj?.permisos === 3) return reply(aviso("No puedes advertir a un Owner."));
 
   // Extraer el motivo
@@ -66,7 +66,7 @@ export const run = async (contexto) => {
   const nueva  = { contenido: motivo, autor: sender, fecha: new Date() };
 
   const actualizado = await User.findOneAndUpdate(
-    { jid: objetivo, groupId: from },
+    { jid: objetivo, communityId },
     { $push: { advs: nueva } },
     { upsert: true, new: true }
   ).lean();

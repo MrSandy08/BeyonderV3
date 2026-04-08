@@ -12,7 +12,7 @@ export const onlyOwner = false;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, react, sender, mentionedJids, args, msg, isWAAdmin, isOwner, sock, from } = contexto;
+  const { reply, react, sender, mentionedJids, args, msg, isWAAdmin, isOwner, sock, from, communityId } = contexto;
 
   const rawBody = (
     msg.message?.conversation ||
@@ -24,7 +24,7 @@ export const run = async (contexto) => {
     if (!isWAAdmin && !isOwner) {
       return reply("⛔ Solo admins pueden ver todas las excusas.");
     }
-    const lista = await User.find({ groupId: from, "afk.activa": true, "afk.motivo": { $ne: null } }).lean();
+    const lista = await User.find({ communityId, "afk.activa": true, "afk.motivo": { $ne: null } }).lean();
     if (!lista.length) return reply("Sin excusas activas en este grupo.");
 
     let txt = "⤷ ゛📝  ˎˊ˗\n♯ ·  · Excusas Activas  ่  ·  ▧\n\n";
@@ -39,9 +39,9 @@ export const run = async (contexto) => {
   if (rawBody.startsWith("!verexcusa") || rawBody.startsWith("!ver excusa")) {
     const objetivo = await userTarget(contexto, User);
     if (!objetivo) return reply("⚠️ Menciona a alguien o escribe su personaje para ver su excusa.");
-    const u     = await User.findOne({ jid: objetivo, groupId: from }).lean();
+    const u     = await User.findOne({ jid: objetivo, communityId }).lean();
     const label = u?.personaje ? `*${u.personaje}*` : numFromJid(objetivo);
-    if (!u?.afk?.activa || !u?.afk?.motivo) return reply(`ℹ️ *${label}* sin excusa activa en este grupo.`);
+    if (!u?.afk?.activa || !u?.afk?.motivo) return reply(`ℹ️ *${label}* sin excusa activa.`);
     return reply(`📝 *Excusa de ${label}:*\n_${u.afk.motivo}_`);
   }
 
@@ -50,7 +50,7 @@ export const run = async (contexto) => {
     const puedeOtros = isWAAdmin || isOwner;
     const argsTarget = args.filter(a => a.toLowerCase() !== "off");
     const objetivo   = puedeOtros ? await userTarget({ ...contexto, args: argsTarget }, User) : sender;
-    const u          = await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { "afk.activa": false, "afk.motivo": null, "afk.fechaExpira": null } }).lean();
+    const u          = await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { "afk.activa": false, "afk.motivo": null, "afk.fechaExpira": null } }).lean();
     const nombre     = u?.personaje || numFromJid(objetivo);
 
     await react("✅");
@@ -74,7 +74,7 @@ export const run = async (contexto) => {
 
   const fechaExpira = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
   const uActualizado = await User.findOneAndUpdate(
-    { jid: objetivo, groupId: from },
+    { jid: objetivo, communityId },
     { $set: { afk: { motivo: motivoRaw, fechaExpira, activa: true } } },
     { upsert: true, new: true }
   ).lean();

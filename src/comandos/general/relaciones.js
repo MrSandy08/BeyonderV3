@@ -12,9 +12,9 @@ const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 
 export const run = async (contexto) => {
-  const { reply, from } = contexto;
+  const { reply, sender, from, communityId } = contexto;
 
-  const usersConPareja = await User.find({ groupId: from, "parejas.0": { $exists: true } }).lean();
+  const usersConPareja = await User.find({ groupId: from, communityId, "parejas.0": { $exists: true } }).lean();
   if (!usersConPareja.length) return reply(aviso("No hay relaciones registradas en este grupo todavía."));
 
   const procesadas = new Set();
@@ -32,7 +32,7 @@ export const run = async (contexto) => {
     let i = 0;
     while (i < cola.length) {
       const actualJid = cola[i++];
-      const userActual = await User.findOne({ jid: actualJid, groupId: from }).lean();
+      const userActual = await User.findOne({ jid: actualJid, communityId }).lean();
       
       if (userActual?.parejas) {
         for (const pJid of userActual.parejas) {
@@ -47,7 +47,7 @@ export const run = async (contexto) => {
 
     if (grupoActual.size > 1) {
       const nombres = await Promise.all(Array.from(grupoActual).map(async jid => {
-        const user = await User.findOne({ jid, groupId: from }).lean();
+        const user = await User.findOne({ jid, groupId: from, communityId }).lean();
         return `*${primerNombre(user?.personaje || numFromJid(jid))}*`;
       }));
       

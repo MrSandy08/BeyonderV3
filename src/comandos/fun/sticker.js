@@ -3,7 +3,7 @@ import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import { Sticker, StickerTypes } from "wa-sticker-formatter";
 import User from "../../database/models/User.js";
 
-export const run = async ({ msg, sock, from, sender, reply, react, isGroup }) => {
+export const run = async ({ msg, sock, from, sender, reply, react, isGroup, communityId }) => {
   const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
   const q = quoted || msg.message;
   const mime = (q.imageMessage || q.videoMessage || q.stickerMessage)?.mimetype || "";
@@ -58,7 +58,7 @@ export const run = async ({ msg, sock, from, sender, reply, react, isGroup }) =>
     }
 
     // Identidad Roleplay: Obtener personaje de la base de datos
-    const userInDB = await User.findOne({ jid: sender, groupId: isGroup ? from : "private" }).lean();
+    const userInDB = await User.findOne({ jid: sender, communityId }).lean();
     const fullIdentity = userInDB?.personaje || userInDB?.nombre || msg.pushName || "Beyonder User";
 
     const sticker = new Sticker(buffer, {

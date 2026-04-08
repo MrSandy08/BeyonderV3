@@ -11,9 +11,9 @@ export const onlyOwner = false;
 const MS_EN_MIN = 60 * 1000;
 
 export const run = async (contexto) => {
-  const { reply, sender, command } = contexto;
+  const { reply, sender, args, communityId } = contexto;
 
-  const user = await User.findOne({ jid: sender });
+  const user = await User.findOne({ jid: sender, communityId });
   if (!user) return;
 
   const ahora = new Date();

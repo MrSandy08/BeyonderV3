@@ -14,9 +14,9 @@ const MS_EN_MIN = 60 * 1000;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { reply, sender, react } = contexto;
+  const { reply, sender, react, communityId } = contexto;
 
-  const user = await User.findOne({ jid: sender });
+  const user = await User.findOne({ jid: sender, communityId });
   if (!user) return;
 
   const ahora = new Date();
@@ -32,7 +32,7 @@ export const run = async (contexto) => {
     return reply(aviso("Menciona a alguien para atracar. 🔫"));
   }
 
-  const victim = await User.findOne({ jid: targetJid });
+  const victim = await User.findOne({ jid: targetJid, communityId });
   const totalVictima = (victim?.money || 0) + (victim?.bank || 0);
   
   if (!victim || totalVictima < 200) {

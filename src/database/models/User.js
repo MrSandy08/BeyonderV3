@@ -39,6 +39,12 @@ const UserSchema = new Schema(
       required: true,
       trim:     true,
     },
+    communityId: {
+      type:     String,
+      required: true,
+      default:  "global", // Para usuarios que no están en una comunidad específica
+      index:    true,
+    },
     groupId: {
       type:     String,
       required: false, // Opcional para un sistema global
@@ -97,6 +103,14 @@ const UserSchema = new Schema(
     jailUntil: {
       type:    Date,
       default: null,
+    },
+
+    // ── Identidad Dinámica ────────────────────────────────────────────────────
+    identidad: {
+      nombre_real: { type: String, default: null },
+      apodo_actual: { type: String, default: null },
+      historial_apodos: [{ type: String }],
+      apodos_rechazados: [{ type: String }]
     },
     dailyStreak: {
       type:    Number,
@@ -157,10 +171,13 @@ const UserSchema = new Schema(
 
 // ─── Índices adicionales ─────────────────────────────────────────────────────
 
-UserSchema.index({ jid: 1 }, { unique: true });
+UserSchema.index({ jid: 1, communityId: 1 }, { unique: true });
 UserSchema.index({ permisos: 1 });
 UserSchema.index({ "afk.activa": 1 });
 UserSchema.index({ personaje: 1 });
+UserSchema.index({ money: -1 });
+UserSchema.index({ msgCount: -1 });
+UserSchema.index({ communityId: 1 });
 
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 

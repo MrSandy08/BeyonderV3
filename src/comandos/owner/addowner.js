@@ -13,13 +13,13 @@ const MAX_OWNERS = 3;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { sender, from, reply, react } = contexto;
+  const { sender, from, reply, react, communityId } = contexto;
 
   const objetivo = await userTarget(contexto, User);
   if (!objetivo || objetivo === sender) return reply(aviso("Menciona al usuario o escribe su personaje que deseas hacer Owner."));
 
   // Verificar si ya es Owner
-  const dbUser = await User.findOne({ jid: objetivo, permisos: 3 }).select("permisos").lean();
+  const dbUser = await User.findOne({ jid: objetivo, communityId, permisos: 3 }).select("permisos").lean();
   if (dbUser?.permisos === 3) return reply(aviso(`*@${numFromJid(objetivo)}* ya es Owner.`), [objetivo]);
 
   // Verificar límite máximo
@@ -28,8 +28,8 @@ export const run = async (contexto) => {
     return reply(aviso(`Acceso denegado. Ya hay *${MAX_OWNERS} owners* en el sistema. Capacidad máxima alcanzada.`));
   }
 
-  // Registrar como Owner
-  await User.findOneAndUpdate({ jid: objetivo, groupId: from }, { $set: { permisos: 3 } }, { upsert: true });
+  // Registrar como Owner globalmente
+  await User.findOneAndUpdate({ jid: objetivo, communityId }, { $set: { permisos: 3, groupId: from } }, { upsert: true });
   await react("👑");
   await reply(aviso(`*@${numFromJid(objetivo)}* ha sido nombrado *Owner* global. Bienvenido al mando. 👑`), [objetivo]);
 };

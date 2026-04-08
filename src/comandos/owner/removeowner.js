@@ -12,12 +12,12 @@ export const onlyOwner = true;
 const numFromJid = (jid) => jid?.split("@")[0] || jid;
 
 export const run = async (contexto) => {
-  const { sender, reply, react } = contexto;
+  const { sender, reply, react, communityId } = contexto;
 
   const objetivo = await userTarget(contexto, User);
   if (!objetivo || objetivo === sender) return reply(aviso("Menciona al owner o escribe su personaje que deseas remover."));
 
-  await User.updateMany({ jid: objetivo }, { $set: { permisos: 0 } });
+  await User.updateMany({ jid: objetivo, communityId }, { $set: { permisos: 0 } });
   await react("✅");
   await reply(aviso(`*@${numFromJid(objetivo)}* ya no es Owner.`), [objetivo]);
 };

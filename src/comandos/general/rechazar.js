@@ -13,7 +13,7 @@ const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 
 export const run = async (contexto) => {
-  const { sender, from, sock, msg, react } = contexto;
+  const { sender, from, sock, msg, react, communityId } = contexto;
 
   let matchKey = null, solicitud = null;
   for (const [key, val] of solicitudes) {
@@ -26,8 +26,8 @@ export const run = async (contexto) => {
   solicitudes.delete(matchKey);
   await react("🥀");
 
-  const miUsuario    = await User.findOne({ jid: sender, groupId: from }).lean();
-  const senderUser   = await User.findOne({ jid: solicitud.sender, groupId: from }).lean();
+  const miUsuario    = await User.findOne({ jid: sender, communityId }).lean();
+  const senderUser   = await User.findOne({ jid: solicitud.sender, communityId }).lean();
   const miNombre     = primerNombre(miUsuario?.personaje    || numFromJid(sender));
   const senderNombre = primerNombre(senderUser?.personaje   || numFromJid(solicitud.sender));
 

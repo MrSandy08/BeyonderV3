@@ -16,7 +16,7 @@ const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 const EXPIRA_MS    = 30 * 60 * 1000;
 
 export const run = async (contexto) => {
-  const { reply, sender, from, sock, msg, args } = contexto;
+  const { reply, sender, from, sock, msg, args, communityId } = contexto;
 
   // Detectar objetivo: mención o personaje
   let targets = (contexto.mentionedJids || []).filter(j => j !== sender);
@@ -33,11 +33,11 @@ export const run = async (contexto) => {
   const targetId = targets[0];
   if (targetId === sender) return reply(aviso("No puedes adoptarte a ti mismo."));
 
-  const miUsuario = await User.findOne({ jid: sender, groupId: from }).lean();
-  if (!miUsuario?.personaje) return reply(aviso("Necesitas tener un *personaje* asignado en este grupo para adoptar."));
+  const miUsuario = await User.findOne({ jid: sender, communityId }).lean();
+  if (!miUsuario?.personaje) return reply(aviso("Necesitas tener un *personaje* asignado globalmente para adoptar."));
 
-  const targetUsuario = await User.findOne({ jid: targetId, groupId: from }).lean();
-  if (!targetUsuario?.personaje) return reply(aviso("El objetivo no tiene un *personaje* asignado en este grupo."));
+  const targetUsuario = await User.findOne({ jid: targetId, communityId }).lean();
+  if (!targetUsuario?.personaje) return reply(aviso(`@${numFromJid(targetId)} no tiene personaje asignado globalmente.`), [targetId]);
 
   // ── VALIDACIONES DE PARENTESCO ─────────────────────────────────────────────
 
@@ -51,18 +51,18 @@ export const run = async (contexto) => {
     if (targetUsuario.kinship.parent === sender) {
       return reply(aviso(`*${primerNombre(targetUsuario.personaje)}* ya es tu hijo/a.`));
     }
-    const parent = await User.findOne({ jid: targetUsuario.kinship.parent, groupId: from }).lean();
+    const parent = await User.findOne({ jid: targetUsuario.kinship.parent, communityId }).lean();
     return reply(aviso(`*${primerNombre(targetUsuario.personaje)}* ya ha sido adoptado/a por *${primerNombre(parent?.personaje || numFromJid(targetUsuario.kinship.parent))}*.`));
   }
 
   // 3. Circularidad: El objetivo no puede ser tu ancestro (padre, abuelo...).
-  const esAncestro = await isAncestor(targetId, sender, from);
+  const esAncestro = await isAncestor(targetId, sender, communityId);
   if (esAncestro) {
     return reply(aviso(`¡No puedes adoptar a tu antecesor! *${primerNombre(targetUsuario.personaje)}* es parte de tu linaje directo.`));
   }
 
   // 4. Hermanos: No pueden adoptarse entre sí.
-  const sonHermanos = await areSiblings(sender, targetId, from);
+  const sonHermanos = await areSiblings(sender, targetId, communityId);
   if (sonHermanos) {
     return reply(aviso(`¡No puedes adoptar a tu hermano/a! Comparten el mismo origen.`));
   }

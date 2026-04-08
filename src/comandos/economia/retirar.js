@@ -9,9 +9,9 @@ export const onlyMod   = false;
 export const onlyOwner = false;
 
 export const run = async (contexto) => {
-  const { reply, sender, args } = contexto;
+  const { reply, sender, args, communityId } = contexto;
 
-  const user = await User.findOne({ jid: sender });
+  const user = await User.findOne({ jid: sender, communityId });
   if (!user) return;
 
   const input = args[0]?.toLowerCase();

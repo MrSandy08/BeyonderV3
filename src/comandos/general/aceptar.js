@@ -13,7 +13,7 @@ const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 
 export const run = async (contexto) => {
-  const { sender, from, sock, msg, react } = contexto;
+  const { sender, from, sock, msg, react, communityId } = contexto;
 
   let matchKey = null, solicitud = null;
   for (const [key, val] of solicitudes) {
@@ -25,9 +25,9 @@ export const run = async (contexto) => {
   solicitud.pendientes.delete(sender);
   await react("💍");
 
-  const miUsuario = await User.findOne({ jid: sender, groupId: from }).lean();
+  const miUsuario = await User.findOne({ jid: sender, communityId }).lean();
   const miNombre  = primerNombre(miUsuario?.personaje || numFromJid(sender));
-  await sock.sendMessage(from, { text: aviso(`*${miNombre}* ha aceptado el lazo en este grupo. 💍`), mentions: [sender] }, { quoted: msg });
+  await sock.sendMessage(from, { text: aviso(`*${miNombre}* ha aceptado el lazo. 💍`), mentions: [sender] }, { quoted: msg });
 
   if (solicitud.pendientes.size === 0) {
     clearTimeout(solicitud.timer);
@@ -37,12 +37,12 @@ export const run = async (contexto) => {
       const parentJid = solicitud.sender;
       const childJid  = solicitud.targets[0];
       
-      // Actualizar parentesco en ambos usuarios
-      await User.findOneAndUpdate({ jid: parentJid, groupId: from }, { $addToSet: { "kinship.children": childJid } }, { upsert: true });
-      await User.findOneAndUpdate({ jid: childJid, groupId: from }, { $set: { "kinship.parent": parentJid } }, { upsert: true });
+      // Actualizar parentesco en ambos usuarios globalmente
+      await User.findOneAndUpdate({ jid: parentJid, communityId }, { $addToSet: { "kinship.children": childJid } }, { upsert: true });
+      await User.findOneAndUpdate({ jid: childJid, communityId }, { $set: { "kinship.parent": parentJid } }, { upsert: true });
       
-      const parentU = await User.findOne({ jid: parentJid, groupId: from }).lean();
-      const childU  = await User.findOne({ jid: childJid, groupId: from }).lean();
+      const parentU = await User.findOne({ jid: parentJid, communityId }).lean();
+      const childU  = await User.findOne({ jid: childJid, communityId }).lean();
       const pNombre = primerNombre(parentU?.personaje || numFromJid(parentJid));
       const cNombre = primerNombre(childU?.personaje || numFromJid(childJid));
       
@@ -52,13 +52,13 @@ export const run = async (contexto) => {
       });
     }
 
-    // Lógica por defecto: Matrimonio (marry)
+    // Lógica por defecto: Matrimonio (marry) global
     const todos = [solicitud.sender, ...solicitud.targets];
     for (const jid of todos) {
-      await User.findOneAndUpdate({ jid, groupId: from }, { $addToSet: { parejas: { $each: todos.filter(j => j !== jid) } } }, { upsert: true });
+      await User.findOneAndUpdate({ jid, communityId }, { $addToSet: { parejas: { $each: todos.filter(j => j !== jid) } } }, { upsert: true });
     }
     const nombres = await Promise.all(todos.map(async id => {
-      const u = await User.findOne({ jid: id, groupId: from }).lean();
+      const u = await User.findOne({ jid: id, communityId }).lean();
       return `*${primerNombre(u?.personaje || numFromJid(id))}*`;
     }));
     const tipo = solicitud.esPoliamor || todos.length > 2 ? "Poliamor" : "Pareja";

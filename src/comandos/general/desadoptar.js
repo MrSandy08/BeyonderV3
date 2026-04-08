@@ -13,7 +13,7 @@ const numFromJid   = (jid) => jid?.split("@")[0] || jid;
 const primerNombre = (n)   => n?.split(" ")[0] || n || "???";
 
 export const run = async (contexto) => {
-  const { reply, sender, from, args } = contexto;
+  const { reply, sender, from, args, communityId } = contexto;
 
   // Detectar objetivo: mención o personaje
   let targets = (contexto.mentionedJids || []).filter(j => j !== sender);
@@ -28,16 +28,15 @@ export const run = async (contexto) => {
   if (!targets.length) return reply(aviso("Menciona a quien quieres desadoptar o escribe su personaje.\n       𝄄   _!desadoptar @usuario_ o _!desadoptar Personaje_"));
 
   const targetId = targets[0];
-  const miUsuario = await User.findOne({ jid: sender, groupId: from });
-  if (!miUsuario?.kinship?.children?.includes(targetId)) {
-    return reply(aviso("Esa persona no es tu hijo/a."));
-  }
+  const miUsuario = await User.findOne({ jid: sender, communityId });
+  if (!miUsuario?.kinship?.children?.includes(targetId))
+    return reply(aviso(`@${numFromJid(targetId)} no es tu hijo/a.`));
 
-  // Actualizar parentesco en ambos usuarios
-  await User.findOneAndUpdate({ jid: sender, groupId: from }, { $pull: { "kinship.children": targetId } });
-  await User.findOneAndUpdate({ jid: targetId, groupId: from }, { $set: { "kinship.parent": null } });
+  // Actualizar ambos globalmente
+  await User.findOneAndUpdate({ jid: sender, communityId }, { $pull: { "kinship.children": targetId } });
+  await User.findOneAndUpdate({ jid: targetId, communityId }, { $set: { "kinship.parent": null } });
 
-  const targetUsuario = await User.findOne({ jid: targetId, groupId: from }).lean();
+  const targetUsuario = await User.findOne({ jid: targetId, communityId }).lean();
   const cNombre = primerNombre(targetUsuario?.personaje || numFromJid(targetId));
 
   return reply(aviso(`💔 *DESADOPTADO*\n\nHas expulsado a *${cNombre}* de tu linaje. Ya no tiene familia. 🥀`));

@@ -1,11 +1,11 @@
 ---
-title: Beyond Squad Detector
-emoji: 🛡️
+title: Beyond Squad
+emoji: ⚡
 colorFrom: blue
 colorTo: purple
 sdk: docker
 pinned: false
 ---
 
-# Beyond Squad Detector API
-Esta es la API de detección para el bot de WhatsApp.
+# Beyond Squad API
+Esta es la API para el bot de WhatsApp.

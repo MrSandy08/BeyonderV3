@@ -17,7 +17,7 @@ const timeAgo    = (f)   => {
 };
 
 export const run = async (contexto) => {
-  const { reply, react, sender, msg, args, from } = contexto;
+  const { reply, react, sender, msg, args, from, communityId } = contexto;
 
   const rawBody = (
     msg.message?.conversation ||
@@ -32,10 +32,10 @@ export const run = async (contexto) => {
 
   // ── !historial @user ───────────────────────────────────────────────────────
   if (rawBody.startsWith("!historial")) {
-    const u = await User.findOne({ jid: objetivo, groupId: from }).lean();
+    const u = await User.findOne({ jid: objetivo, communityId }).lean();
     const nombre = u?.personaje || numFromJid(objetivo);
     if (!u || (!u.notas?.length && !u.advs?.length))
-      return reply(aviso(`Sin historial para *${nombre}* en este grupo.`));
+      return reply(aviso(`Sin historial para *${nombre}*.`));
 
     let txt = `\u200e \u200e \u200e  \u200e \u200e ━━━━━━━━ ꒰ ᧔🗂️᧓ ꒱ ━━━━━━━━\n                     ⤹ ⊹ ୨୧ 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 ⿻ ₊˚๑\n     ━━━━━━━━━━━━━━━━━━━━━━━\n`;
     txt += `                     𝄄 𓈒   ⁺ *${nombre}*   𓏼\n\n`;
@@ -64,12 +64,12 @@ export const run = async (contexto) => {
   if (!texto) return reply(aviso("Escribe el texto de la nota.\n       𝄄   _Uso: !nota @user texto_"));
 
   const uActual = await User.findOneAndUpdate(
-    { jid: objetivo, groupId: from },
+    { jid: objetivo, communityId },
     { $push: { notas: { contenido: texto, autor: sender, fecha: new Date() } } },
     { upsert: true, new: true }
   ).lean();
 
   const nombreObj = uActual?.personaje || numFromJid(objetivo);
   await react("✅");
-  await reply(aviso(`Nota guardada para *${nombreObj}* en este grupo. 📌`));
+  await reply(aviso(`Nota guardada para *${nombreObj}*. 📌`));
 };

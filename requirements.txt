@@ -15,5 +15,3 @@ accelerate
 sentencepiece
 pydantic
 typing-extensions
-axios
-form-data

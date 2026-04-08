@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, Body
+from fastapi import FastAPI, File, UploadFile, Body, Response
+from fastapi.responses import FileResponse
 from nudenet import NudeDetector
 import os
 import shutil
@@ -11,6 +12,42 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 app = FastAPI()
+
+@app.get("/")
+async def read_root():
+    """Interfaz simple para HF Spaces"""
+    if os.path.exists("qr.png"):
+        return Response(content="""
+        <html>
+            <head><title>Beyonder v3 - QR</title></head>
+            <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
+                <h1>📱 Beyonder v3</h1>
+                <p>Escanea este código con tu WhatsApp para iniciar sesión.</p>
+                <img src="/qr" style="border: 10px solid white; border-radius: 10px; background: white;" />
+                <p style="margin-top: 20px; color: #888;">Si ya lo escaneaste, espera a que el bot se conecte.</p>
+                <script>setInterval(() => location.reload(), 10000);</script>
+            </body>
+        </html>
+        """, media_type="text/html")
+    
+    return Response(content="""
+    <html>
+        <head><title>Beyonder v3 - Estado</title></head>
+        <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
+            <h1>🚀 Beyonder v3</h1>
+            <p>Bot iniciado correctamente.</p>
+            <p style="color: #4CAF50;">✅ Sistema IA (NudeNet + CLIP + LLM) cargado y listo.</p>
+            <p style="margin-top: 20px; color: #888;">Esperando eventos de WhatsApp...</p>
+        </body>
+    </html>
+    """, media_type="text/html")
+
+@app.get("/qr")
+async def get_qr():
+    """Sirve el archivo qr.png generado por el bot"""
+    if os.path.exists("qr.png"):
+        return FileResponse("qr.png")
+    return {"status": "no_qr"}
 
 # Carga global de modelos al arrancar el Space (CPU)
 device = "cpu"

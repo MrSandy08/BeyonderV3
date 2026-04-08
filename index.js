@@ -8,7 +8,9 @@ import { useMongoDBAuthState } from "./src/utils/mongoAuthState.js";
 import { MongoClient } from "mongodb";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
-import qrcode from "qrcode-terminal";
+import qrcodeTerminal from "qrcode-terminal";
+import qrcode from "qrcode";
+import fs from "fs";
 
 import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
@@ -84,11 +86,21 @@ const conectarWhatsApp = async (comandos) => {
 
       if (qr && !PHONE_NUMBER) {
         console.log("\n📱 Escanea este QR con tu WhatsApp:\n");
-        qrcode.generate(qr, { small: true });
+        qrcodeTerminal.generate(qr, { small: true });
+
+        // Guardar QR como imagen para visualización en web (HF Spaces)
+        try {
+          await qrcode.toFile("./qr.png", qr);
+          console.log("🖼️ QR guardado como qr.png para acceso remoto.");
+        } catch (e) {
+          console.error("❌ Error al guardar QR como imagen:", e.message);
+        }
       }
 
       if (connection === "open") {
         console.log("✅ WhatsApp conectado correctamente.\n");
+        // Borrar el QR si existe al conectar
+        if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
       }
 
       if (connection === "close") {

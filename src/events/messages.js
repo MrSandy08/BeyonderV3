@@ -6,7 +6,8 @@ import Affinity from "../database/models/Affinity.js";
 import CommunityState from "../database/models/CommunityState.js";
 import GroupSlang from "../database/models/GroupSlang.js";
 import { shouldRespondOrganically } from "../utils/socialFilter.js";
-import { getAiResponse, evaluateNickname, detectNicknameIntent } from "../services/iaService.js";
+import { getAiResponse, evaluateNickname, detectNicknameIntent, addFatigue } from "../services/iaService.js";
+import { enviarReaccionNeko } from "../services/reaccionesService.js";
 import BanList from "../database/models/BanList.js";
 import { solicitudes } from "../store/solicitudes.js";
 import { searches } from "../store/searches.js";
@@ -22,7 +23,6 @@ import PQueue from "p-queue";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { Worker } from "worker_threads";
-import { getAiResponse, addFatigue } from "../services/iaService.js";
 import { spawnRandomGift } from "../comandos/economia/claim.js";
 import play from "play-dl";
 
@@ -596,6 +596,11 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               if (action?.type === "BAUTIZO") {
                 await Affinity.updateOne({ jid: sender, communityId }, { $set: { "nickname.accepted": true, "nickname.final": action.nickname } });
                 await User.updateOne({ jid: sender, communityId }, { $set: { "identidad.apodo_actual": action.nickname }, $addToSet: { "identidad.historial_apodos": action.nickname } });
+              }
+
+              // ── Procesar Reacciones (Neko.best) ──
+              if (action?.reaction) {
+                await enviarReaccionNeko(sock, from, action.reaction, msg, finalMentions);
               }
 
               // ── Gestión de Promesas (Detectar intenciones) ──

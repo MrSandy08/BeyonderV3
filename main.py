@@ -7,11 +7,15 @@ import torch
 import clip
 from PIL import Image, ImageOps, ImageEnhance
 import io
+import time
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from pydantic import BaseModel
 from typing import List, Optional
 
 app = FastAPI()
+
+# Configuración de Hugging Face
+hf_token = os.getenv("HF_TOKEN")
 
 @app.get("/")
 async def read_root():
@@ -61,13 +65,28 @@ model_clip, preprocess = clip.load("ViT-B/32", device=device)
 
 print("Cargando LLM (Qwen2.5-0.5B-Instruct)...")
 model_id = "Qwen/Qwen2.5-0.5B-Instruct"
-tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+# Cargar con reintentos para evitar Rate Limit
+def load_with_retry(load_func, *args, **kwargs):
+    for i in range(3):
+        try:
+            return load_func(*args, **kwargs)
+        except Exception as e:
+            if "429" in str(e) and i < 2:
+                print(f"⚠️ Rate limit (429) detectado. Reintentando en 60s... (Intento {i+1}/3)")
+                time.sleep(60)
+            else:
+                raise e
+
+tokenizer = load_with_retry(AutoTokenizer.from_pretrained, model_id, token=hf_token)
 # Usar float32 para CPU y optimizar el uso de memoria
-llm_model = AutoModelForCausalLM.from_pretrained(
+llm_model = load_with_retry(
+    AutoModelForCausalLM.from_pretrained,
     model_id, 
     torch_dtype=torch.float32, 
     device_map="cpu",
-    low_cpu_mem_usage=True
+    low_cpu_mem_usage=True,
+    token=hf_token
 )
 llm_pipeline = pipeline("text-generation", model=llm_model, tokenizer=tokenizer, device=-1)
 

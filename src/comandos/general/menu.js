@@ -36,7 +36,7 @@ cmdLine("👤","apodo [nick]",     "Cambiar tu apodo en el grupo."),
 cmdLine("💡","sugerencia",       "Envía una sugerencia para el bot."),
 cmdLine("🚩","reporte",         "Reporta un problema o usuario."),
 cmdLine("👁️","ver adv/excusa",   "Ver advertencias o excusas (propio o @user)."),
-cmdLine("🎮","menu 2",           "Menú de acciones RP (hug, kiss, sticker...)."),
+cmdLine("🎨","sticker / s",      "Convierte imagen/video en sticker."),
 category("💰 𝓔conomía"),
 cmdLine("🎁","daily / diario",   "Reclama tu bono diario de monedas."),
 cmdLine("💼","work / trabajar",  "Trabaja para ganar monedas."),
@@ -56,69 +56,6 @@ cmdLine("🕊️","fianza",          "Paga para salir de la cárcel."),
 cmdLine("🎰","suerte [monto]",   "Apuesta dinero en el casino."),
 cmdLine("🚬","crimen",          "Realiza un acto delictivo (70% éxito)."),
 `\n   𝄄   _Usa *!smenu* para ver comandos de Admin/Mod._`,
-].join("");
-
-// ══════════════════════════════════════════════════════════════
-//  !menu 2 — acciones RP
-// ══════════════════════════════════════════════════════════════
-const MENU_ACCIONES = [
-header("Acciones RP"),
-category("🤝 𝓘nteracciones"),
-cmdLine("🤗","hug / abrazo",    "Abrazar a alguien."),
-cmdLine("💋","kiss / beso",   "Besar a alguien."),
-cmdLine("🥰","pat / acariciar",    "Dar palmaditas."),
-cmdLine("🫂","cuddle / mimos",  "Acurrucarse."),
-cmdLine("🤏","tickle / cosquillas", "Hacer cosquillas."),
-cmdLine("🍲","feed / alimentar", "Dar de comer."),
-cmdLine("👅","lick / lamer",     "Lamer a alguien."),
-cmdLine("😈","bite / morder",    "Morder a alguien."),
-cmdLine("🤝","handhold / mano", "Tomar de la mano."),
-category("🎭 𝓔xpresiones"),
-cmdLine("😊","smile / sonreir",  "Sonreír."),
-cmdLine("👋","wave / saludar",   "Saludar."),
-cmdLine("😳","blush / sonrojar", "Sonrojarse."),
-cmdLine("😭","cry / llorar",      "Llorar."),
-cmdLine("💃","dance / bailar",    "Bailar."),
-cmdLine("😤","pout / puchero",    "Hacer un puchero."),
-cmdLine("🤷","shrug / encogerse", "Encogerse de hombros."),
-cmdLine("😴","sleep / dormir",    "Dormir."),
-cmdLine("👀","stare / mirar",     "Mirar fijamente."),
-cmdLine("🤔","think / pensar",    "Pensar."),
-cmdLine("👍","thumbsup / aprobacion", "Pulgar arriba."),
-cmdLine("😉","wink / guiño",      "Guiñar un ojo."),
-cmdLine("🥱","bored / aburrimiento", "Aburrirse."),
-cmdLine("😂","laugh / risa",      "Reírse."),
-cmdLine("😖","cringe / asco",     "Sentir cringe."),
-cmdLine("✨","happy / feliz",      "Estar feliz."),
-cmdLine("🐈","tail / cola",       "Mover la cola."),
-cmdLine("🎵","vibe / vibrar",     "Vibrar."),
-category("⚔️ 𝓒ombate y Otros"),
-cmdLine("👋","slap / bofetada",   "Dar una bofetada."),
-cmdLine("👊","punch / puñetazo",  "Golpear."),
-cmdLine("👉","poke / picar",      "Picar."),
-cmdLine("💨","yeet / lanzar",     "Lanzar lejos."),
-cmdLine("😒","bully / molestar",  "Molestar."),
-cmdLine("🙌","highfive / cinco",  "Chocar los cinco."),
-cmdLine("💀","kill / matar",      "Acabar con alguien."),
-cmdLine("😠","glare / mirada",    "Mirar feo."),
-cmdLine("😋","nom / comer",       "Morder (nom)."),
-cmdLine("💆","backrub / masaje_espalda", "Masaje espalda."),
-cmdLine("💆‍♂️","headrub / masaje_cabeza", "Masaje cabeza."),
-cmdLine("🖕","insult / insultar", "Insultar."),
-cmdLine("😘","kisscheek / beso_mejilla", "Beso en mejilla."),
-cmdLine("💆‍♀️","massage / masaje", "Dar un masaje."),
-cmdLine("🍑","spank / nalgada",   "Dar una nalgada."),
-cmdLine("⚔️","attack / atacar",   "Atacar."),
-cmdLine("💨","dodge / esquivar",  "Esquivar."),
-cmdLine("🔫","shoot / disparar",  "Disparar."),
-cmdLine("🔪","stab / apuñalar",   "Apuñalar."),
-category("🔥 𝓔speciales"),
-cmdLine("🔥","sex / sexo",        "Situación intensa... 😏"),
-cmdLine("🏋️","carry / cargar",    "Cargar a alguien."),
-cmdLine("🐎","pback / caballito", "Subirse a la espalda."),
-cmdLine("🫦","kabedon / acorralar", "Acorralar."),
-category("🖼️ 𝓜edia"),
-cmdLine("🎨","s / sticker",  "Convierte la imagen/video citado en sticker."),
 ].join("");
 
 // ══════════════════════════════════════════════════════════════
@@ -194,7 +131,6 @@ export const run = async (contexto) => {
     msg.message?.extendedTextMessage?.text || ""
   ).trim().toLowerCase();
 
-  if (args[0] === "2")             return reply(MENU_ACCIONES);
   if (rawBody.startsWith("!smenu")) {
     if (!isWAAdmin && !isMod && !isOwner)
       return reply(aviso("Este menú es solo para Admins y Moderadores."));

@@ -202,9 +202,11 @@ export const getAiResponse = async (sender, from, communityId, userName, message
       `- Usa abreviaturas: "q" (que), "pq" (porque), "tmbn" (también), "xq" (por qué), "nd" (nada), "mano", "klk".\n` +
       `- NO uses puntos finales al terminar un mensaje.\n` +
       `- NO uses emojis.\n` +
-      `- Si alguien hace algo tonto, ponle un apodo corto y gracioso de forma dominante. Si decides bautizar a alguien, usa este formato al final de tu mensaje: [BAUTIZO: apodo].\n\n` +
+      `- Si alguien hace algo tonto, ponle un apodo corto y gracioso de forma dominante. Si decides bautizar a alguien, usa este formato al final de tu mensaje: [BAUTIZO: apodo].\n` +
+      `- Cuando quieras reaccionar físicamente, usa el formato [REACCION: tipo] al final. TIPOS VÁLIDOS (Neko.best): pat, hug, cuddle, slap, poke, tickle, handshake, smile, laugh, cry, blush, sleep, shrug, bored, stare, think, thumbsup. \n` +
+      `- IMPORTANTE: No seas dulce ni "kawaii" a menos que sea con @Nathaniel. Con los demás, usa slap si te molestan o shrug si te da igual lo q dicen. \n\n` +
       `Tus GUSTOS: ${identity.likes.join(", ")}. Tus DISGUSTOS: ${identity.dislikes.join(", ")}.\n` +
-      `Contexto: Grupo ${from.split('@')[0]} | Afinidad con ${userName}: ${ctx.affinity}/100.\n` +
+      `Contexto: Grupo ${from.split('@')[0]} | Afinidad con ${userName}: ${ctx.affinity}/100.\n`,old_str: +
       `Te diriges a ${ctx.nickname || userName}${ctx.nickname ? " (este es su apodo aceptado, ÚSALO)" : ""}.\n` +
       `USUARIOS MENCIONADOS:\n${ctx.othersContext || "Ninguno."}\n\n` +
       `INSTRUCCIONES:\n` +
@@ -255,6 +257,12 @@ export const getAiResponse = async (sender, from, communityId, userName, message
     if (bautizoMatch) {
       action = { type: "BAUTIZO", nickname: bautizoMatch[1].trim() };
       finalResponse = finalResponse.replace(/\[BAUTIZO:.*?\]/gi, "").trim();
+    }
+
+    const reaccionMatch = finalResponse.match(/\[REACCION:\s*([^\]]+)\]/i);
+    if (reaccionMatch) {
+      action = { ...action, reaction: reaccionMatch[1].trim() };
+      finalResponse = finalResponse.replace(/\[REACCION:.*?\]/gi, "").trim();
     }
 
     return { text: finalResponse, action };

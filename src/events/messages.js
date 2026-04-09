@@ -240,10 +240,10 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.videoMessage?.caption || "";
 
       const isCmd   = texto.startsWith(config.PREFIX);
-      const meta    = isGroup ? await getGroupMeta(sock, from) : null;
-      const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
+      const meta    = isGroup ? await getGroupMeta(sock, from).catch(() => null) : null;
+      const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean().catch(() => null) : null;
       const communityId = meta?.linkedParent || cfg?.communityId || (isGroup ? from : "private");
-      const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, communityId, permisos: 3 }).lean());
+      const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, communityId, permisos: 3 }).lean().catch(() => null));
       const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
 
       // ── 1.2 Procesamiento de Media (Visión Local) ──

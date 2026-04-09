@@ -44,30 +44,34 @@ export const run = async (contexto) => {
 
   console.log(`[DEBUG INFO] Usuario procesado en DB: ${u ? u.personaje : 'Error'}`);
 
+  if (!u) {
+    return reply("❌ No pude encontrar ni crear tu perfil en la base de datos. Intenta enviar un mensaje normal primero.");
+  }
+
   // Determinar Rango Administrativo (WA)
   const participant = contexto.meta?.participants?.find(p => p.id === objetivo);
   const isWAAdmin    = participant?.admin === "admin" || participant?.admin === "superadmin";
   const rangoWA      = isWAAdmin ? "🛡️ Administrador" : "👤 Miembro";
 
   // Determinar Rango del Bot
-  const isGlobalOwner = config.OWNERS.includes(objetivo) || (u.permisos === 3);
+  const isGlobalOwner = config.OWNERS.includes(objetivo) || (u?.permisos === 3);
   let rangoBot = "👤 Usuario";
   if (isGlobalOwner) {
     rangoBot = "👑 Owner";
-  } else if (u.permisos === 2) {
+  } else if (u?.permisos === 2) {
     rangoBot = "🛡️ Moderador";
-  } else if (u.permisos === 1) {
+  } else if (u?.permisos === 1) {
     rangoBot = "🤝 Helper";
   }
 
-  const advCount  = (u.advs || []).length;
-  const mensajes  = u.msgCount || 0;
-  const personaje = u.personaje || "Sin asignar";
-  const cartera   = u.money || 0;
-  const banco     = u.bank || 0;
+  const advCount  = (u?.advs || []).length;
+  const mensajes  = u?.msgCount || 0;
+  const personaje = u?.personaje || "Sin asignar";
+  const cartera   = u?.money || 0;
+  const banco     = u?.bank || 0;
 
   let parejasStr = "Ninguna";
-  const parejas = u.parejas || [];
+  const parejas = u?.parejas || [];
   if (parejas.length) {
     const nombres = await Promise.all(
       parejas.map(async (jid) => {

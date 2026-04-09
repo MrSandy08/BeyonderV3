@@ -238,6 +238,13 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         msg.message?.imageMessage?.caption ||
         msg.message?.videoMessage?.caption || "";
 
+      const isCmd   = texto.startsWith(config.PREFIX);
+      const meta    = isGroup ? await getGroupMeta(sock, from) : null;
+      const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
+      const communityId = meta?.linkedParent || cfg?.communityId || (isGroup ? from : "private");
+      const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, communityId, permisos: 3 }).lean());
+      const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
+
       // ── 1.2 Procesamiento de Media (Visión Local) ──
       let visualContext = "";
       let isMorboso = false;
@@ -288,22 +295,12 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           }
         }
       }
-      const isCmd   = textoFinal.startsWith(config.PREFIX);
-        const meta    = isGroup ? await getGroupMeta(sock, from) : null;
-        const cfg     = isGroup ? await Config.findOne({ groupId: from }).lean() : null;
-
-        // ── Detección Automática de Comunidad ──
-        const communityId = meta?.linkedParent || cfg?.communityId || (isGroup ? from : "private");
-
-        const isOwner = config.OWNERS.includes(sender) || (await User.findOne({ jid: sender, communityId, permisos: 3 }).lean());
-        const isAdmin = isGroup ? isWAAdmin(meta, sender) : true;
 
         // ── 1. PRIORIDAD: Contador de Mensajes, Afinidad y Autoreparación ──
         const dbUser = await User.findOneAndUpdate(
           { jid: sender, communityId: communityId },
           { 
             $setOnInsert: { 
-              nombre: userName,
               personaje: null,
               money: 0,
               bank: 0,

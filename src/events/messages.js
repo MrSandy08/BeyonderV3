@@ -317,19 +317,25 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           },
           { upsert: true, new: true, lean: true }
         ).catch(e => {
-          console.error("❌ Error DB Contador:", e.message);
+          if (e.code !== 11000) { // Ignorar error de duplicado por concurrencia
+            console.error("❌ Error DB Contador:", e.message);
+          }
           return null;
         });
 
         // Actualizar Afinidad e Interacciones
         await Affinity.findOneAndUpdate(
-          { jid: sender, communityId },
+          { jid: sender, communityId: communityId },
           { 
             $inc: { points: 0.1, interactions: 1 }, 
             $set: { lastInteraction: new Date() } 
           },
           { upsert: true }
-        );
+        ).catch(e => {
+          if (e.code !== 11000) {
+            console.error("❌ Error DB Afinidad:", e.message);
+          }
+        });
 
         // ── 1.1. Monitoreo de Tensión y "Peleas" ──
         if (isGroup) {

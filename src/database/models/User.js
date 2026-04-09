@@ -178,6 +178,7 @@ UserSchema.index({ personaje: 1 });
 UserSchema.index({ money: -1 });
 UserSchema.index({ msgCount: -1 });
 UserSchema.index({ communityId: 1 });
+UserSchema.index({ jid: 1 });
 
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 

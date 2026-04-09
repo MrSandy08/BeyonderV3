@@ -61,23 +61,8 @@ const conectarWhatsApp = async (comandos) => {
       auth:                state,
       logger:              pino({ level: "silent" }),
       markOnlineOnConnect: false,
-      printQRInTerminal:   true, // Siempre imprimir en terminal como backup
+      printQRInTerminal:   true, 
     });
-
-    // ── Lógica de Código de Vinculación (Pairing Code) ───────────────────────
-    if (PHONE_NUMBER && !sock.authState.creds.registered) {
-      console.log(`\n📲 MODO PAIRING CODE: Solicitando código para ${PHONE_NUMBER}...`);
-      setTimeout(async () => {
-        try {
-          const code = await sock.requestPairingCode(PHONE_NUMBER);
-          console.log(`\n🔗 TU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
-          // También guardar en un archivo para acceso web
-          fs.writeFileSync("./pairing.txt", code);
-        } catch (e) {
-          console.error("❌ Error al solicitar código de vinculación:", e.message);
-        }
-      }, 5000); 
-    }
 
     // ── Guardar credenciales al actualizarse ────────────────────────────────
     sock.ev.on("creds.update", saveCreds);
@@ -101,9 +86,8 @@ const conectarWhatsApp = async (comandos) => {
 
       if (connection === "open") {
         console.log("✅ WhatsApp conectado correctamente.\n");
-        // Borrar archivos temporales al conectar
+        // Borrar el QR si existe al conectar
         if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
-        if (fs.existsSync("./pairing.txt")) fs.unlinkSync("./pairing.txt");
       }
 
       if (connection === "close") {

@@ -58,42 +58,46 @@ export const useMongoDBAuthState = async (collection) => {
     await writeData(creds, "creds");
   }
 
-  return {
-    state: {
-      creds,
-      keys: {
-        get: async (type, ids) => {
-          const data = {};
-          await Promise.all(
-            ids.map(async (id) => {
-              let value = await readData(`${type}-${id}`);
-              if (type === "app-state-sync-key" && value) {
-                value = proto.Message.AppStateSyncKeyData.fromObject(value);
-              }
-              data[id] = value;
-            })
-          );
-          return data;
-        },
-        set: async (data) => {
-          const tasks = [];
-          for (const category in data) {
-            for (const id in data[category]) {
-              const value = data[category][id];
-              const key = `${category}-${id}`;
-              if (value) {
-                tasks.push(writeData(value, key));
-              } else {
-                tasks.push(removeData(key));
-              }
+  const state = {
+    creds,
+    keys: {
+      get: async (type, ids) => {
+        const data = {};
+        await Promise.all(
+          ids.map(async (id) => {
+            let value = await readData(`${type}-${id}`);
+            if (type === "app-state-sync-key" && value) {
+              value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            }
+            data[id] = value;
+          })
+        );
+        return data;
+      },
+      set: async (data) => {
+        const tasks = [];
+        for (const category in data) {
+          for (const id in data[category]) {
+            const value = data[category][id];
+            const key = `${category}-${id}`;
+            if (value) {
+              tasks.push(writeData(value, key));
+            } else {
+              tasks.push(removeData(key));
             }
           }
-          await Promise.all(tasks);
-        },
+        }
+        await Promise.all(tasks);
       },
     },
+  };
+
+  return {
+    state,
     saveCreds: async () => {
-      await writeData(creds, "creds");
+      await writeData(state.creds, "creds");
     },
   };
 };
+
+export default useMongoDBAuthState;

@@ -114,18 +114,20 @@ const conectarWhatsApp = async (comandos) => {
         
         console.log(`❌ Conexión cerrada. Razón: ${reason} | Código: ${codigo}`);
 
-        const debeReconectar = codigo !== DisconnectReason.loggedOut;
+        // Si el código es 401 (loggedOut), eliminamos sesión.
+        // Pero a veces Baileys da otros códigos en cierres normales de HF.
+        const debeReconectar = codigo !== DisconnectReason.loggedOut && codigo !== 401;
 
         if (debeReconectar) {
           const delay = 5000;
           console.log(`🔄 Reconectando en ${delay/1000}s...`);
           setTimeout(() => conectarWhatsApp(comandos), delay);
         } else {
-          console.log("🚪 Sesión cerrada (Logged Out). Limpiando datos de autenticación...");
+          console.log("🚪 Sesión cerrada definitivamente (Logged Out). Limpiando datos de autenticación...");
           try {
             // Como usamos MongoDB para auth, borramos la colección 'auth'
             await collection.deleteMany({});
-            console.log("✅ Datos de sesión borrados. Reiniciando bot para generar nuevo acceso...");
+            console.log("✅ Datos de sesión borrados de MongoDB. Reiniciando bot para generar nuevo acceso...");
             setTimeout(() => conectarWhatsApp(comandos), 2000);
           } catch (e) {
             console.error("❌ Error al limpiar sesión en MongoDB:", e.message);

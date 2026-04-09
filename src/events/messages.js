@@ -9,6 +9,7 @@ import { shouldRespondOrganically } from "../utils/socialFilter.js";
 import { getAiResponse, evaluateNickname, detectNicknameIntent, addFatigue } from "../services/iaService.js";
 import { enviarReaccionNeko } from "../services/reaccionesService.js";
 import BanList from "../database/models/BanList.js";
+import BeyonderCore from "../database/models/BeyonderCore.js";
 import { solicitudes } from "../store/solicitudes.js";
 import { searches } from "../store/searches.js";
 import { analyzeImage, analyzeWithClip } from "../utils/detector.js";
@@ -304,7 +305,6 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
               personaje: null,
               money: 0,
               bank: 0,
-              msgCount: 0,
               permisos: 0,
               lastDaily: new Date(0)
             },

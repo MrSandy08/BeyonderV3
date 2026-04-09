@@ -6,10 +6,13 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 // ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
-const AI_SERVER_URL = `http://127.0.0.1:7860/detect`;
-const AI_NSFW_URL   = `http://127.0.0.1:7860/detect/nsfw`;
-const AI_GORE_URL   = `http://127.0.0.1:7860/detect/gore`;
-const AI_CLIP_URL   = `http://127.0.0.1:7860/detect/clip`; // Nueva ruta para CLIP puro
+const AI_PORT = process.env.PORT || 7860;
+const AI_BASE_URL = `http://localhost:${AI_PORT}`;
+
+const AI_SERVER_URL = `${AI_BASE_URL}/detect`;
+const AI_NSFW_URL   = `${AI_BASE_URL}/detect/nsfw`;
+const AI_GORE_URL   = `${AI_BASE_URL}/detect/gore`;
+const AI_CLIP_URL   = `${AI_BASE_URL}/detect/clip`; // Nueva ruta para CLIP puro
 
 // ... (NSFW_THRESHOLDS same)
 

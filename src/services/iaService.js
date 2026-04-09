@@ -221,10 +221,14 @@ export const getAiResponse = async (sender, from, communityId, userName, message
     });
 
     // 5. Formatear Historial (Últimos 6 mensajes) 
-    const formattedHistory = history.map(h => ({
-      role: h.role === "assistant" ? "assistant" : "user",
-      content: h.content
-    })).slice(-6);
+    const historyArray = Array.isArray(history) ? history : [];
+    const formattedHistory = historyArray
+      .filter(h => h && typeof h === 'object' && h.content)
+      .map(h => ({
+        role: h.role === "assistant" ? "assistant" : "user",
+        content: String(h.content)
+      }))
+      .slice(-6);
 
     console.log(`[IA DEBUG] 2. Conectando con Groq...`);
 

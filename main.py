@@ -34,6 +34,24 @@ async def read_root():
         </html>
         """, media_type="text/html")
     
+    if os.path.exists("pairing.txt"):
+        with open("pairing.txt", "r") as f:
+            code = f.read().strip()
+        return Response(content=f"""
+        <html>
+            <head><title>Beyonder v3 - Pairing</title></head>
+            <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
+                <h1>🔗 Beyonder v3</h1>
+                <p>Usa este código en tu WhatsApp (Dispositivos vinculados > Vincular con número de teléfono):</p>
+                <div style="font-size: 3em; font-weight: bold; color: #4CAF50; letter-spacing: 5px; margin: 20px 0; border: 2px dashed #4CAF50; padding: 20px; display: inline-block;">
+                    {code}
+                </div>
+                <p style="margin-top: 20px; color: #888;">El código expira en unos minutos. Refresca si es necesario.</p>
+                <script>setInterval(() => location.reload(), 15000);</script>
+            </body>
+        </html>
+        """, media_type="text/html")
+    
     return Response(content="""
     <html>
         <head><title>Beyonder v3 - Estado</title></head>

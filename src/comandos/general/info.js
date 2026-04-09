@@ -19,27 +19,30 @@ export const run = async (contexto) => {
   console.log(`[DEBUG INFO] Solicitando info para: ${objetivo} (sender: ${sender})`);
   
   // ── Lógica de Comunidad (Unificado por JID + CommunityId) ──
-  let u = await User.findOne({ jid: objetivo, communityId }).lean();
-  console.log(`[DEBUG INFO] Usuario encontrado en DB: ${u ? u.personaje : 'No existe'}`);
+  // Si no existe, lo creamos (Autoreparación) con findOneAndUpdate (upsert) para evitar duplicados
+  let u = await User.findOneAndUpdate(
+    { jid: objetivo, communityId },
+    { 
+      $setOnInsert: { 
+        nombre: pushname || "Usuario",
+        money: 0,
+        bank: 0,
+        msgCount: 0,
+        permisos: 0,
+        personaje: null,
+        groupId: from // Referencia inicial
+      } 
+    },
+    { upsert: true, new: true, lean: true }
+  ).catch(e => {
+    if (e.code === 11000) {
+      // Si hubo una carrera por el upsert, intentamos buscarlo de nuevo
+      return User.findOne({ jid: objetivo, communityId }).lean();
+    }
+    throw e;
+  });
 
-  // Si no existe, lo creamos (Autoreparación)
-  if (!u) {
-    u = await User.findOneAndUpdate(
-      { jid: objetivo, communityId },
-      { 
-        $setOnInsert: { 
-          nombre: pushname || "Usuario",
-          money: 0,
-          bank: 0,
-          msgCount: 0,
-          permisos: 0,
-          personaje: null,
-          groupId: from // Referencia inicial
-        } 
-      },
-      { upsert: true, new: true, lean: true }
-    );
-  }
+  console.log(`[DEBUG INFO] Usuario procesado en DB: ${u ? u.personaje : 'Error'}`);
 
   // Determinar Rango Administrativo (WA)
   const participant = contexto.meta?.participants?.find(p => p.id === objetivo);

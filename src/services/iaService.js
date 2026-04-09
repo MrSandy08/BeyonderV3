@@ -237,8 +237,8 @@ export const getAiResponse = async (sender, from, communityId, userName, message
       messages: [
         { role: "system", content: systemPrompt },
         ...formattedHistory,
-        { role: "user", content: message }
-      ],
+        { role: "user", content: String(message || "...") }
+      ].filter(m => m.content && String(m.content).trim() !== ""),
       model: "llama-3.3-70b-versatile",
       temperature: 1.0,
       max_tokens: 400,

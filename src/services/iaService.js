@@ -220,7 +220,7 @@ export const getAiResponse = async (sender, from, communityId, userName, message
       $inc: { "status.patience": -1, "status.fatigue": 0.5 } 
     });
 
-    // 5. Formatear Historial (Últimos 6 mensajes)
+    // 5. Formatear Historial (Últimos 6 mensajes) 
     const formattedHistory = history.map(h => ({
       role: h.role === "assistant" ? "assistant" : "user",
       content: h.content

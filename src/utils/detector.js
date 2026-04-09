@@ -41,7 +41,9 @@ export async function analyzeWithClip(buffer) {
     console.error("❌ Error analyzeWithClip:", error.message);
     return { tags: [], isSuggestive: false };
   }
-}DE UMBRALES (NudeNet) ──────────────────────────────────────
+}
+
+// ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
 const NSFW_THRESHOLDS = {
   'FEMALE_GENITALIA_EXPOSED': 0.30,
   'MALE_GENITALIA_EXPOSED':   0.30,

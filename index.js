@@ -61,20 +61,22 @@ const conectarWhatsApp = async (comandos) => {
       auth:                state,
       logger:              pino({ level: "silent" }),
       markOnlineOnConnect: false,
-      printQRInTerminal:   !PHONE_NUMBER, // Solo imprime QR si NO hay número para vincular
+      printQRInTerminal:   true, // Siempre imprimir en terminal como backup
     });
 
     // ── Lógica de Código de Vinculación (Pairing Code) ───────────────────────
     if (PHONE_NUMBER && !sock.authState.creds.registered) {
-      console.log(`\n📲 Generando código de vinculación para: ${PHONE_NUMBER}`);
+      console.log(`\n📲 MODO PAIRING CODE: Solicitando código para ${PHONE_NUMBER}...`);
       setTimeout(async () => {
         try {
           const code = await sock.requestPairingCode(PHONE_NUMBER);
           console.log(`\n🔗 TU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
+          // También guardar en un archivo para acceso web
+          fs.writeFileSync("./pairing.txt", code);
         } catch (e) {
           console.error("❌ Error al solicitar código de vinculación:", e.message);
         }
-      }, 3000); // Pequeño delay para asegurar que el socket esté listo
+      }, 5000); 
     }
 
     // ── Guardar credenciales al actualizarse ────────────────────────────────
@@ -84,14 +86,14 @@ const conectarWhatsApp = async (comandos) => {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      if (qr && !PHONE_NUMBER) {
-        console.log("\n📱 Escanea este QR con tu WhatsApp:\n");
+      if (qr) {
+        console.log("\n📱 NUEVO QR GENERADO. Escanea con tu WhatsApp:\n");
         qrcodeTerminal.generate(qr, { small: true });
 
         // Guardar QR como imagen para visualización en web (HF Spaces)
         try {
           await qrcode.toFile("./qr.png", qr);
-          console.log("🖼️ QR guardado como qr.png para acceso remoto.");
+          console.log("🖼️ QR guardado como qr.png en la raíz.");
         } catch (e) {
           console.error("❌ Error al guardar QR como imagen:", e.message);
         }
@@ -99,8 +101,9 @@ const conectarWhatsApp = async (comandos) => {
 
       if (connection === "open") {
         console.log("✅ WhatsApp conectado correctamente.\n");
-        // Borrar el QR si existe al conectar
+        // Borrar archivos temporales al conectar
         if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
+        if (fs.existsSync("./pairing.txt")) fs.unlinkSync("./pairing.txt");
       }
 
       if (connection === "close") {

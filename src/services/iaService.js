@@ -206,7 +206,7 @@ export const getAiResponse = async (sender, from, communityId, userName, message
       `- Cuando quieras reaccionar físicamente, usa el formato [REACCION: tipo] al final. TIPOS VÁLIDOS (Neko.best): pat, hug, cuddle, slap, poke, tickle, handshake, smile, laugh, cry, blush, sleep, shrug, bored, stare, think, thumbsup. \n` +
       `- IMPORTANTE: No seas dulce ni "kawaii" a menos que sea con @Nathaniel. Con los demás, usa slap si te molestan o shrug si te da igual lo q dicen. \n\n` +
       `Tus GUSTOS: ${identity.likes.join(", ")}. Tus DISGUSTOS: ${identity.dislikes.join(", ")}.\n` +
-      `Contexto: Grupo ${from.split('@')[0]} | Afinidad con ${userName}: ${ctx.affinity}/100.\n`,old_str: +
+      `Contexto: Grupo ${from.split('@')[0]} | Afinidad con ${userName}: ${ctx.affinity}/100.\n` +
       `Te diriges a ${ctx.nickname || userName}${ctx.nickname ? " (este es su apodo aceptado, ÚSALO)" : ""}.\n` +
       `USUARIOS MENCIONADOS:\n${ctx.othersContext || "Ninguno."}\n\n` +
       `INSTRUCCIONES:\n` +

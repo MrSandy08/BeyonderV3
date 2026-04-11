@@ -4,8 +4,11 @@ import User    from "../database/models/User.js";
 import Config  from "../database/models/Config.js";
 import UserClass from "../classes/User.js";
 import GroupClass from "../classes/Group.js";
+import pluginLoader from "../classes/PluginLoader.js";
+import { processIntent, analizarEmocion } from "../middlewares/intentHandler.js";
 import Affinity from "../database/models/Affinity.js";
 import CommunityState from "../database/models/CommunityState.js";
+import fetch from "node-fetch";
 import GroupSlang from "../database/models/GroupSlang.js";
 import { shouldRespondOrganically } from "../utils/socialFilter.js";
 import { getAiResponse, evaluateNickname, detectNicknameIntent, addFatigue } from "../services/iaService.js";
@@ -16,6 +19,7 @@ import { solicitudes } from "../store/solicitudes.js";
 import { searches } from "../store/searches.js";
 import { analyzeImage, analyzeWithClip } from "../utils/detector.js";
 import { aviso } from "../utils/format.js";
+import axios from "axios";
 import { downloadContentFromMessage, downloadMediaMessage } from "@whiskeysockets/baileys";
 import fs from "fs";
 import { join } from "path";
@@ -198,7 +202,7 @@ async function handleSearchSelection(sock, msg, from, sender, text) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const handleMessages = async ({ messages, type }, sock, comandos) => {
+const handleMessages = async ({ messages, type }, sock) => {
   if (type !== "notify") return;
 
     for (const msg of messages) {
@@ -300,7 +304,7 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
         // ── 1. PRIORIDAD: Contador de Mensajes, Afinidad y Autoreparación ──
-        // Beyonder v4: Usar Clase de Usuario y Grupo para centralizar lógica
+        // Beyonder v4: Usar Clase de Usuario con Redis
         const u = await UserClass.findOrCreate(sender, communityId, {
           personaje: null,
           money: 0,
@@ -312,13 +316,9 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
         }).catch(() => null);
 
         if (u) {
-          await User.updateOne(
-            { jid: sender, communityId },
-            { 
-              $set: { lastMessage: new Date(), nombre: userName, groupId: groupJid },
-              $inc: { msgCount: 1 }
-            }
-          ).catch(() => {});
+          await u.incrementMsgCount();
+          // Registrar actividad en el Dashboard (v4.3)
+          axios.post(`http://localhost:${config.PORT}/api/user-activity`, { jid: sender, name: userName }).catch(() => {});
         }
 
         // Actualizar Afinidad e Interacciones
@@ -644,131 +644,171 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
           continue;
         }
 
-      // ── 8. Manejo de Comandos ──────────────────────────────────────────
-      if (!isCmd) {
+      // ── 8. Manejo de Comandos (Beyonder v4: NLU Middleware) ──────────────
+      const intent = await processIntent(texto, isGroup, isAdmin, isOwner);
+
+      if (intent.type === "ignore") {
         if (await handleSearchSelection(sock, msg, from, sender, texto)) continue;
         continue;
       }
 
-      const body = texto.trim();
-      const command = body.split(/\s+/)[0].toLowerCase().slice(config.PREFIX.length);
-      const args = body.split(/\s+/).slice(1);
-      const text = args.join(" ");
-
-      if (!comandos.has(command)) continue;
-
-      // ── 8.5 Verificación de Economía Activa ───────────────────────────
-      const ECO_CMDS = [
-        "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
-        "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
-        "extort", "cultivar", "cosechar", "plantar",
-        "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
-        "depositar", "retirar", "fianza", "claim", "reclamar", "regalo", "impuesto"
-      ];
-
-      if (ECO_CMDS.includes(command) && isGroup && cfg && cfg.economyActive === false) {
-        return; // No responder nada si la economía está en OFF
-      }
-
-      const { run, onlyAdmin, onlyMod, onlyOwner } = comandos.get(command);
-      
-      const permisos = dbUser?.permisos ?? 0;
-      const userIsMod = isAdmin && (permisos >= 2 || isOwner);
-
-      // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────
-      if (dbUser?.isJailed) {
-        const ahora = new Date();
-        if (dbUser.jailUntil && dbUser.jailUntil > ahora) {
-          const ECO_CMDS = [
-            "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
-            "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
-            "extort", "cultivar", "cosechar", "plantar",
-            "crimen", "suerte"
-          ];
-
-          if (ECO_CMDS.includes(command)) {
-            const restante = Math.ceil((dbUser.jailUntil - ahora) / 60000);
-            return await sock.sendMessage(from, { 
-              text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes realizar actividades económicas mientras cumples tu condena.\n       𝄄   _Tiempo restante: ${restante} minutos_\n       𝄄   _Usa *!fianza* para salir inmediatamente._` 
-            }, { quoted: msg });
-          }
-        } else {
-          // Si el tiempo expiró, liberar automáticamente
-          await User.updateOne({ jid: sender, communityId }, { $set: { isJailed: false, jailUntil: null } });
-        }
-      }
-
-      let tienePermiso = true;
-      let motivo       = "";
-
-      if      (onlyOwner && !isOwner)              { tienePermiso = false; motivo = "⛔ Solo *Owners* pueden usar este comando."; }
-      else if (onlyMod   && !userIsMod && !isOwner) { tienePermiso = false; motivo = "⛔ Solo *Moderadores* u Owners pueden usar este comando."; }
-      else if (onlyAdmin && !isAdmin && !isOwner)   { tienePermiso = false; motivo = "⛔ Solo *Admins* del grupo pueden usar este comando."; }
-
-      if (!tienePermiso) {
-        await sock.sendMessage(from, { text: motivo }, { quoted: msg });
+      if (intent.type === "attack") {
+        console.warn(`🚨 [v4] Intento de ataque detectado de ${sender}: ${intent.reason}`);
+        await sock.sendMessage(from, { text: "⚠️ Actividad sospechosa detectada. Reportando..." }, { quoted: msg });
         continue;
       }
 
-      // Sumar fatiga por comando
-      if (["mine", "fish", "reporte"].includes(command)) {
-        addFatigue(10);
+      if (intent.type === "chat") {
+        // ── 8.1 Procesar Análisis Emocional Automático (v4.4 con Groq) ──
+        if (intent.text.length > 2) {
+          const analisis = await analizarEmocion(intent.text);
+          
+          if (analisis && analisis.intensidad > 6) {
+            try {
+              const nekoRes = await fetch(`https://neko.best/api/v2/${analisis.accion_neko}`);
+              const nekoJson = await nekoRes.json();
+              const { url } = nekoJson.results[0];
+
+              await sock.sendMessage(from, { 
+                video: { url: url }, 
+                caption: analisis.respuesta_texto, 
+                gifPlayback: true 
+              }, { quoted: msg });
+
+              // Ajuste de afinidad automático (v4.4)
+              if (analisis.emocion === 'agresivo') await u.removeMoney(50); // Multa por ser agresivo
+              if (analisis.emocion === 'amistoso') await Affinity.updateOne({ jid: sender, communityId }, { $inc: { points: 2 } });
+              
+              continue; // Detener flujo para que no responda doble
+            } catch (e) {
+              console.error("❌ Fallo en reacción emocional Groq:", e.message);
+            }
+          }
+        }
+
+        // Pasar a IA con personalidad de Beyonder (Fallback o respuesta normal)
+        const { text: response } = await getAiResponse(sender, from, communityId, userName, intent.text, [], false);
+        if (response) await sock.sendMessage(from, { text: response }, { quoted: msg });
+        continue;
       }
 
-      const contexto = {
-        msg, sock, sender, from, args, isGroup, command, text,
-        remoteJid: from,
-        communityId,
-        isWAAdmin:  isAdmin,
-        isMod:      userIsMod,
-        isOwner:    isOwner,
-        permisos:   isOwner ? 3 : permisos,
-        cfg:        cfg || {},
-        meta,
-        config,
-        mentionedJids: msg.message?.[mtype]?.contextInfo?.mentionedJid ?? [],
-        reply:  async (text, mentions = []) => {
-          for (let i = 0; i < 3; i++) {
-            try {
-              if (!sock || !sock.ev) return;
-              return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
-            } catch (e) {
-              if (e.message?.includes('Connection Closed')) {
-                console.warn(`⚠️ Intento de envío fallido: Conexión cerrada. Deteniendo reintentos.`);
-                return;
-              }
-              if (i === 2) throw e;
-              await new Promise(r => setTimeout(r, 1000));
-            }
-          }
-        },
-        send:   async (text, mentions = []) => {
-          for (let i = 0; i < 3; i++) {
-            try {
-              if (!sock || !sock.ev) return;
-              return await sock.sendMessage(from, { text, mentions });
-            } catch (e) {
-              if (e.message?.includes('Connection Closed')) return;
-              if (i === 2) throw e;
-              await new Promise(r => setTimeout(r, 1000));
-            }
-          }
-        },
-        react:  async (emoji) => {
-          for (let i = 0; i < 3; i++) {
-            try {
-              if (!sock || !sock.ev) return;
-              return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
-            } catch (e) {
-              if (e.message?.includes('Connection Closed')) return;
-              if (i === 2) throw e;
-              await new Promise(r => setTimeout(r, 1000));
-            }
-          }
-        },
-      };
+      if (intent.type === "command") {
+        const { command, args, name } = intent;
+        const text = args.join(" ");
 
-      await run(contexto);
+        // ── 8.5 Verificación de Economía Activa ───────────────────────────
+        const ECO_CMDS = [
+          "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
+          "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
+          "extort", "cultivar", "cosechar", "plantar",
+          "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
+          "depositar", "retirar", "fianza", "claim", "reclamar", "regalo", "impuesto"
+        ];
+
+        if (ECO_CMDS.includes(name) && isGroup && cfg && cfg.economyActive === false) {
+          continue;
+        }
+
+        const { run, onlyAdmin, onlyMod, onlyOwner } = command;
+        const userIsMod = isAdmin && (u.isMod() || isOwner);
+
+        // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────
+        if (u.data.isJailed) {
+          const ahora = new Date();
+          const jailUntil = new Date(u.data.jailUntil);
+          if (jailUntil > ahora) {
+            if (ECO_CMDS.includes(name)) {
+              const restante = Math.ceil((jailUntil - ahora) / 60000);
+              await sock.sendMessage(from, { 
+                text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes realizar actividades económicas mientras cumples tu condena.\n       𝄄   _Tiempo restante: ${restante} minutos_\n       𝄄   _Usa *!fianza* para salir inmediatamente._` 
+              }, { quoted: msg });
+              continue;
+            }
+          } else {
+            // Si el tiempo expiró, liberar automáticamente
+            await User.updateOne({ jid: sender, communityId }, { $set: { isJailed: false, jailUntil: null } });
+            u.data.isJailed = false;
+          }
+        }
+
+        let tienePermiso = true;
+        let motivo       = "";
+
+        if      (onlyOwner && !isOwner)              { tienePermiso = false; motivo = "⛔ Solo *Owners* pueden usar este comando."; }
+        else if (onlyMod   && !userIsMod && !isOwner) { tienePermiso = false; motivo = "⛔ Solo *Moderadores* u Owners pueden usar este comando."; }
+        else if (onlyAdmin && !isAdmin && !isOwner)   { tienePermiso = false; motivo = "⛔ Solo *Admins* del grupo pueden usar este comando."; }
+
+        if (!tienePermiso) {
+          await sock.sendMessage(from, { text: motivo }, { quoted: msg });
+          continue;
+        }
+
+        // Sumar fatiga por comando
+        if (["mine", "fish", "reporte"].includes(name)) {
+          addFatigue(10);
+        }
+
+        const contexto = {
+          msg, sock, sender, from, args, isGroup, command: name, text,
+          remoteJid: from,
+          communityId,
+          isWAAdmin:  isAdmin,
+          isMod:      userIsMod,
+          isOwner:    isOwner,
+          permisos:   isOwner ? 3 : (u.data.permisos || 0),
+          cfg:        cfg || {},
+          meta,
+          config,
+          user:       u, // Pasar el objeto User de la v4
+          mentionedJids: msg.message?.[mtype]?.contextInfo?.mentionedJid ?? [],
+          reply:  async (text, mentions = []) => {
+            for (let i = 0; i < 3; i++) {
+              try {
+                if (!sock || !sock.ev) return;
+                return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+              } catch (e) {
+                if (e.message?.includes('Connection Closed')) {
+                  console.warn(`⚠️ Intento de envío fallido: Conexión cerrada. Deteniendo reintentos.`);
+                  return;
+                }
+                if (i === 2) throw e;
+                await new Promise(r => setTimeout(r, 1000));
+              }
+            }
+          },
+          send:   async (text, mentions = []) => {
+            for (let i = 0; i < 3; i++) {
+              try {
+                if (!sock || !sock.ev) return;
+                return await sock.sendMessage(from, { text, mentions });
+              } catch (e) {
+                if (e.message?.includes('Connection Closed')) return;
+                if (i === 2) throw e;
+                await new Promise(r => setTimeout(r, 1000));
+              }
+            }
+          },
+          react:  async (emoji) => {
+            for (let i = 0; i < 3; i++) {
+              try {
+                if (!sock || !sock.ev) return;
+                return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
+              } catch (e) {
+                if (e.message?.includes('Connection Closed')) return;
+                if (i === 2) throw e;
+                await new Promise(r => setTimeout(r, 1000));
+              }
+            }
+          },
+        };
+
+        try {
+          await run(contexto);
+        } catch (err) {
+          console.error(`❌ Error en comando !${name}:`, err.message);
+          await sock.sendMessage(from, { text: `❌ Error al ejecutar !${name}: ${err.message}` }, { quoted: msg }).catch(() => {});
+        }
+      }
 
     } catch (err) {
       console.error("❌ Error crítico en handleMessages:", err);

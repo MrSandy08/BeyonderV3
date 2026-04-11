@@ -14,10 +14,13 @@ import fs from "fs";
 
 import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
-import cargarComandos from "./src/handlers/commandHandler.js";
+import pluginLoader   from "./src/classes/PluginLoader.js";
 import handleMessages from "./src/events/messages.js";
 import { handleGroupParticipantsUpdate, handleGroupUpdate } from "./src/events/groupUpdate.js";
 import { checkGroupInactivity } from "./src/services/initiativeService.js";
+import { startDashboard } from "./src/dashboard/server.js";
+
+import UserClass      from "./src/classes/User.js";
 
 const { MONGO_URI, PORT, PHONE_NUMBER, OWNERS } = config;
 
@@ -41,7 +44,7 @@ import { promisify } from "util";
 
 const execPromise = promisify(exec);
 
-const conectarWhatsApp = async (comandos) => {
+const conectarWhatsApp = async () => {
   try {
     if (!mongoClient) {
       console.log("Intentando conectar a DB para sesión...");
@@ -104,6 +107,9 @@ const conectarWhatsApp = async (comandos) => {
         // Borrar archivos temporales al conectar
         if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
         if (fs.existsSync("./pairing.txt")) fs.unlinkSync("./pairing.txt");
+
+        // 🌐 Iniciar Dashboard
+        startDashboard(sock);
       }
 
       if (connection === "close") {
@@ -121,14 +127,14 @@ const conectarWhatsApp = async (comandos) => {
         if (debeReconectar) {
           const delay = 5000;
           console.log(`🔄 Reconectando en ${delay/1000}s...`);
-          setTimeout(() => conectarWhatsApp(comandos), delay);
+          setTimeout(() => conectarWhatsApp(), delay);
         } else {
           console.log("🚪 Sesión cerrada definitivamente (Logged Out). Limpiando datos de autenticación...");
           try {
             // Como usamos MongoDB para auth, borramos la colección 'auth'
             await collection.deleteMany({});
             console.log("✅ Datos de sesión borrados de MongoDB. Reiniciando bot para generar nuevo acceso...");
-            setTimeout(() => conectarWhatsApp(comandos), 2000);
+            setTimeout(() => conectarWhatsApp(), 2000);
           } catch (e) {
             console.error("❌ Error al limpiar sesión en MongoDB:", e.message);
           }
@@ -140,7 +146,7 @@ const conectarWhatsApp = async (comandos) => {
     //  2. ESCUCHADOR DE MENSAJES
     // ════════════════════════════════════════════════════════════════════════
     sock.ev.on("messages.upsert", (upsert) =>
-      handleMessages(upsert, sock, comandos)
+      handleMessages(upsert, sock)
     );
 
     // ── Gestión de Eventos de Grupo ──────────────────────────────────────────
@@ -154,6 +160,9 @@ const conectarWhatsApp = async (comandos) => {
 
     // ── 3. SISTEMA DE INICIATIVA (Cada 1 hora) ───────────────────────────────
     setInterval(() => checkGroupInactivity(sock), 60 * 60 * 1000);
+
+    // ── 4. SINCRONIZACIÓN REDIS -> MONGO (Cada 5 minutos) ────────────────────
+    setInterval(() => UserClass.syncAllToDB(), 5 * 60 * 1000);
 
     return sock;
   } catch (err) {
@@ -179,11 +188,28 @@ const main = async () => {
   await connectDB();
 
   // 2. Cargar todos los comandos antes de abrir el socket
-  console.log("📂 Cargando comandos...");
-  const comandos = await cargarComandos();
+  console.log("📂 Cargando comandos con Hot-Reload...");
+  await pluginLoader.loadAll();
 
   // 3. Conectar a WhatsApp
-  await conectarWhatsApp(comandos);
+  await conectarWhatsApp();
 };
 
 main();
+
+// ── 5. MANEJO DE CIERRE (Emergency Sync) ───────────────────────────────────
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🛑 Recibido ${signal}. Iniciando guardado de emergencia...`);
+  try {
+    // Sincronizar datos de usuarios de Redis a Mongo antes de salir
+    await UserClass.syncAllToDB();
+    console.log("✅ Datos sincronizados correctamente. Cerrando bot...");
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Error durante el guardado de emergencia:", err.message);
+    process.exit(1);
+  }
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

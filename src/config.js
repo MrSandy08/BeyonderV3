@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 export const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/beyonder";
+export const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 export const PORT = process.env.PORT || 7860;
 export const PREFIX = process.env.PREFIX || "!";
 export const OWNERS = process.env.OWNER_JID
@@ -23,9 +24,11 @@ export const COOKIES_BROWSER = process.env.COOKIES_BROWSER || "";
 const rawPhone = (process.env.PHONE_NUMBER || "").trim();
 export const PHONE_NUMBER = (rawPhone === "" || rawPhone === "undefined" || rawPhone === "null") ? null : rawPhone;
 export const HF_TOKEN = process.env.HF_TOKEN || "";
+export const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 
 const config = {
   MONGO_URI,
+  REDIS_URL,
   PORT,
   PREFIX,
   OWNERS,
@@ -35,6 +38,7 @@ const config = {
   COOKIES_BROWSER,
   PHONE_NUMBER,
   HF_TOKEN,
+  GROQ_API_KEY,
 };
 
 if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {

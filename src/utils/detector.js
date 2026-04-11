@@ -6,8 +6,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 // ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
-const HF_SPACE_URL = process.env.HF_SPACE_URL || "http://localhost:7860";
-const AI_BASE_URL = HF_SPACE_URL.endsWith("/") ? HF_SPACE_URL.slice(0, -1) : HF_SPACE_URL;
+const AI_BASE_URL = "http://localhost:8000";
 
 const AI_SERVER_URL = `${AI_BASE_URL}/detect`;
 const AI_NSFW_URL   = `${AI_BASE_URL}/detect/nsfw`;

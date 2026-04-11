@@ -1,5 +1,6 @@
 // src/comandos/general/info.js
-import User from "../../database/models/User.js";
+import UserClass from "../../classes/User.js";
+import UserSchema from "../../database/models/User.js";
 import { aviso, infoHeader, infoField } from "../../utils/format.js";
 import userTarget from "../../utils/userTarget.js";
 import config from "../../config.js";
@@ -15,37 +16,22 @@ export const onlyOwner = false;
 export const run = async (contexto) => {
   const { reply, from, sender, pushname, communityId } = contexto;
 
-  const objetivo = await userTarget(contexto, User);
+  const objetivo = await userTarget(contexto, UserSchema);
   console.log(`[DEBUG INFO] Solicitando info para: ${objetivo} (sender: ${sender})`);
   
-  // ── Lógica de Comunidad (Unificado por JID + CommunityId) ──
-  // Si no existe, lo creamos (Autoreparación) con findOneAndUpdate (upsert) para evitar duplicados
-  let u = await User.findOneAndUpdate(
-    { jid: objetivo, communityId },
-    { 
-      $setOnInsert: { 
-        nombre: pushname || "Usuario",
-        money: 0,
-        bank: 0,
-        msgCount: 0,
-        permisos: 0,
-        personaje: null,
-        groupId: from // Referencia inicial
-      } 
-    },
-    { upsert: true, new: true, lean: true }
-  ).catch(e => {
-    if (e.code === 11000) {
-      // Si hubo una carrera por el upsert, intentamos buscarlo de nuevo
-      return User.findOne({ jid: objetivo, communityId }).lean();
-    }
-    throw e;
+  // ── Beyonder v4: Usar Clase de Usuario ──
+  const u = await UserClass.findOrCreate(objetivo, communityId, {
+    nombre: pushname || "Usuario",
+    money: 0,
+    bank: 0,
+    msgCount: 0,
+    permisos: 0,
+    personaje: null,
+    groupId: from
   });
 
-  console.log(`[DEBUG INFO] Usuario procesado en DB: ${u ? u.personaje : 'Error'}`);
-
   if (!u) {
-    return reply("❌ No pude encontrar ni crear tu perfil en la base de datos. Intenta enviar un mensaje normal primero.");
+    return reply("❌ Error al procesar el perfil en la base de datos.");
   }
 
   // Determinar Rango Administrativo (WA)
@@ -53,29 +39,27 @@ export const run = async (contexto) => {
   const isWAAdmin    = participant?.admin === "admin" || participant?.admin === "superadmin";
   const rangoWA      = isWAAdmin ? "🛡️ Administrador" : "👤 Miembro";
 
-  // Determinar Rango del Bot
-  const isGlobalOwner = config.OWNERS.includes(objetivo) || (u?.permisos === 3);
+  // Determinar Rango del Bot usando métodos de clase
+  const isGlobalOwner = u.isOwner(config.OWNERS);
   let rangoBot = "👤 Usuario";
   if (isGlobalOwner) {
     rangoBot = "👑 Owner";
-  } else if (u?.permisos === 2) {
+  } else if (u.isMod()) {
     rangoBot = "🛡️ Moderador";
-  } else if (u?.permisos === 1) {
+  } else if (u.isHelper()) {
     rangoBot = "🤝 Helper";
   }
 
-  const advCount  = (u?.advs || []).length;
-  const mensajes  = u?.msgCount || 0;
-  const personaje = u?.personaje || "Sin asignar";
-  const cartera   = u?.money || 0;
-  const banco     = u?.bank || 0;
+  // Obtener estadísticas usando método de clase
+  const stats = u.getStats();
+  const personaje = u.getPersonaje();
 
   let parejasStr = "Ninguna";
-  const parejas = u?.parejas || [];
+  const parejas = u.data.parejas || [];
   if (parejas.length) {
     const nombres = await Promise.all(
       parejas.map(async (jid) => {
-        const p = await User.findOne({ jid, communityId }).select("personaje").lean();
+        const p = await UserSchema.findOne({ jid, communityId }).select("personaje").lean();
         return p?.personaje || numFromJid(jid);
       })
     );
@@ -87,11 +71,11 @@ export const run = async (contexto) => {
     infoField("Personaje",    `*${personaje}*`) +
     infoField("Rango Grupo",  rangoWA) +
     infoField("Rango Bot",    rangoBot) +
-    infoField("Cartera",      `*$${cartera.toLocaleString()}*`) +
-    infoField("Banco",        `*$${banco.toLocaleString()}*`) +
-    infoField("Total",        `*$${(cartera + banco).toLocaleString()}*`) +
-    infoField("Mensajes",     `*${mensajes}*`) +
-    infoField("Advertencias", `*${advCount}/3*`) +
+    infoField("Cartera",      `*$${stats.money.toLocaleString()}*`) +
+    infoField("Banco",        `*$${stats.bank.toLocaleString()}*`) +
+    infoField("Total",        `*$${stats.total.toLocaleString()}*`) +
+    infoField("Mensajes",     `*${stats.msgCount}*`) +
+    infoField("Advertencias", `*${stats.advCount}/3*`) +
     infoField("Parejas",      `*${parejasStr}*`) +
     `\n\n                     𝄄@𝐀𝗍𝗍𝖾 : ℬeyonder`;
 

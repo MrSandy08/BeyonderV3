@@ -2,6 +2,8 @@
 import config  from "../config.js";
 import User    from "../database/models/User.js";
 import Config  from "../database/models/Config.js";
+import UserClass from "../classes/User.js";
+import GroupClass from "../classes/Group.js";
 import Affinity from "../database/models/Affinity.js";
 import CommunityState from "../database/models/CommunityState.js";
 import GroupSlang from "../database/models/GroupSlang.js";
@@ -298,30 +300,26 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
       }
 
         // ── 1. PRIORIDAD: Contador de Mensajes, Afinidad y Autoreparación ──
-        const dbUser = await User.findOneAndUpdate(
-          { jid: sender, communityId: communityId },
-          { 
-            $setOnInsert: { 
-              personaje: null,
-              money: 0,
-              bank: 0,
-              permisos: 0,
-              lastDaily: new Date(0)
-            },
-            $set: { 
-              lastMessage: new Date(), 
-              groupId: groupJid,
-              nombre: userName 
-            }, 
-            $inc: { msgCount: 1 } 
-          },
-          { upsert: true, new: true, lean: true }
-        ).catch(e => {
-          if (e.code !== 11000) { // Ignorar error de duplicado por concurrencia
-            console.error("❌ Error DB Contador:", e.message);
-          }
-          return null;
-        });
+        // Beyonder v4: Usar Clase de Usuario y Grupo para centralizar lógica
+        const u = await UserClass.findOrCreate(sender, communityId, {
+          personaje: null,
+          money: 0,
+          bank: 0,
+          permisos: 0,
+          lastDaily: new Date(0),
+          nombre: userName,
+          groupId: groupJid
+        }).catch(() => null);
+
+        if (u) {
+          await User.updateOne(
+            { jid: sender, communityId },
+            { 
+              $set: { lastMessage: new Date(), nombre: userName, groupId: groupJid },
+              $inc: { msgCount: 1 }
+            }
+          ).catch(() => {});
+        }
 
         // Actualizar Afinidad e Interacciones
         await Affinity.findOneAndUpdate(
@@ -339,13 +337,12 @@ const handleMessages = async ({ messages, type }, sock, comandos) => {
 
         // ── 1.1. Monitoreo de Tensión y "Peleas" ──
         if (isGroup) {
-          let state = await CommunityState.findOne({ communityId });
-          if (!state) state = await CommunityState.create({ communityId });
-
+          const g = await GroupClass.get(from);
+          
           // Detección de gritos (Mayúsculas)
           const isShouting = textoFinal.length > 5 && textoFinal === textoFinal.toUpperCase() && /[A-Z]/.test(textoFinal);
           if (isShouting) {
-            await CommunityState.updateOne({ communityId }, { $inc: { tension: 2 } });
+            await g.addTension(2);
           }
           
           // Actualizar última actividad

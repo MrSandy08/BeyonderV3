@@ -38,6 +38,7 @@ process.on("uncaughtException", (err) => {
 //  1. CONEXIÓN A WHATSAPP (Baileys)
 // ════════════════════════════════════════════════════════════════════════════
 let mongoClient = null;
+let currentSock = null;
 
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -66,6 +67,8 @@ const conectarWhatsApp = async () => {
       markOnlineOnConnect: false,
       printQRInTerminal:   true, 
     });
+
+    currentSock = sock;
 
     // ── Lógica de Código de Vinculación (Pairing Code) ───────────────────────
     if (PHONE_NUMBER && !sock.authState.creds.registered) {
@@ -107,9 +110,6 @@ const conectarWhatsApp = async () => {
         // Borrar archivos temporales al conectar
         if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
         if (fs.existsSync("./pairing.txt")) fs.unlinkSync("./pairing.txt");
-
-        // 🌐 Iniciar Dashboard
-        startDashboard(sock);
       }
 
       if (connection === "close") {
@@ -191,7 +191,12 @@ const main = async () => {
   console.log("📂 Cargando comandos con Hot-Reload...");
   await pluginLoader.loadAll();
 
-  // 3. Conectar a WhatsApp
+  // 3. Iniciar Dashboard inmediatamente (v4.5.1 para HF Spaces)
+  // Pasamos una función que devuelve el socket actual
+  console.log("🌐 Iniciando Dashboard de control...");
+  startDashboard(() => currentSock);
+
+  // 4. Conectar a WhatsApp
   await conectarWhatsApp();
 };
 

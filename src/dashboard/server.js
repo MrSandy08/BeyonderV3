@@ -18,7 +18,7 @@ let nluActive = true;
  */
 export const isNluActive = () => nluActive;
 
-export const startDashboard = (sock) => {
+export const startDashboard = (getSock) => {
   const app = express();
   const httpServer = createServer(app);
   const io = new Server(httpServer);
@@ -125,6 +125,7 @@ export const startDashboard = (sock) => {
   });
 
   app.get("/", (req, res) => {
+    const sock = typeof getSock === 'function' ? getSock() : null;
     res.send(`
       <html>
         <head>

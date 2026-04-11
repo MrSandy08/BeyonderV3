@@ -1,6 +1,7 @@
 // src/classes/PluginLoader.js
 import fs from "fs";
-import { join, pathToFileURL } from "path";
+import { join } from "path";
+import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 
 /**

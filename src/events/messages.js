@@ -710,6 +710,12 @@ const handleMessages = async ({ messages, type }, sock) => {
         }
 
         const { run, onlyAdmin, onlyMod, onlyOwner } = command;
+        
+        if (!u) {
+          console.error("❌ [v4] El usuario no pudo ser cargado o creado. Abortando comando.");
+          continue;
+        }
+
         const userIsMod = isAdmin && (u.isMod() || isOwner);
 
         // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────

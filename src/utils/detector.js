@@ -6,12 +6,27 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 // ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
-const AI_BASE_URL = "http://localhost:8000";
+const AI_BASE_URL = "http://127.0.0.1:8000";
 
 const AI_SERVER_URL = `${AI_BASE_URL}/detect`;
 const AI_NSFW_URL   = `${AI_BASE_URL}/detect/nsfw`;
 const AI_GORE_URL   = `${AI_BASE_URL}/detect/gore`;
 const AI_CLIP_URL   = `${AI_BASE_URL}/detect/clip`; // Nueva ruta para CLIP puro
+
+/**
+ * Helper para reintentar peticiones HTTP al servidor de IA
+ */
+const axiosWithRetry = async (config, retries = 3, delay = 2000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios(config);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.warn(`⚠️ [IA] Intento ${i+1} fallido. Reintentando en ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+};
 
 // ... (NSFW_THRESHOLDS same)
 
@@ -24,7 +39,10 @@ export async function analyzeWithClip(buffer) {
     const form = new FormData();
     form.append('file', buffer, { filename: 'image.jpg' });
 
-    const response = await axios.post(AI_CLIP_URL, form, {
+    const response = await axiosWithRetry({
+      method: 'post',
+      url: AI_CLIP_URL,
+      data: form,
       headers: { ...form.getHeaders() },
       timeout: 15000 
     });
@@ -70,7 +88,10 @@ export async function scanNsfw(buffer) {
     const form = new FormData();
     form.append('file', buffer, { filename: 'image.jpg' });
 
-    const response = await axios.post(AI_NSFW_URL, form, {
+    const response = await axiosWithRetry({
+      method: 'post',
+      url: AI_NSFW_URL,
+      data: form,
       headers: { ...form.getHeaders() },
       timeout: 30000 
     });
@@ -115,7 +136,10 @@ export async function scanGore(buffer) {
     const form = new FormData();
     form.append('file', buffer, { filename: 'image.jpg' });
 
-    const response = await axios.post(AI_GORE_URL, form, {
+    const response = await axiosWithRetry({
+      method: 'post',
+      url: AI_GORE_URL,
+      data: form,
       headers: { ...form.getHeaders() },
       timeout: 30000 
     });
@@ -147,7 +171,10 @@ export async function analyzeImage(buffer) {
     const form = new FormData();
     form.append('file', buffer, { filename: 'image.jpg' });
 
-    const response = await axios.post(AI_SERVER_URL, form, {
+    const response = await axiosWithRetry({
+      method: 'post',
+      url: AI_SERVER_URL,
+      data: form,
       headers: { ...form.getHeaders() },
       timeout: 30000 
     });

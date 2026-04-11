@@ -153,99 +153,6 @@ src/utils/userTarget.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/classes/PluginLoader.js">
-// src/classes/PluginLoader.js
-⋮----
-/**
- * Beyonder v4: Plugin & Command Loader
- * Permite cargar, recargar y gestionar comandos dinámicamente con Hot-Reload.
- */
-class PluginLoader
-⋮----
-/**
-   * Carga todos los comandos y activa el Hot-Reload.
-   */
-async loadAll()
-⋮----
-/**
-   * Inicia el observador de archivos para recarga automática.
-   */
-startWatcher()
-⋮----
-ignored: /(^|[\/\\])\../, // ignora archivos ocultos
-⋮----
-// Eliminar el comando y sus alias
-⋮----
-/**
-   * Carga un comando individual.
-   */
-async loadCommand(category, file)
-⋮----
-// Usar cache busting para permitir Hot-Reload (import dinámico con timestamp)
-⋮----
-/**
-   * Busca un comando por nombre o alias.
-   */
-getCommand(name)
-⋮----
-/**
-   * Recarga un comando específico manualmente si es necesario.
-   */
-async reloadCommand(name)
-</file>
-
-<file path="src/dashboard/server.js">
-// src/dashboard/server.js
-⋮----
-/**
- * Beyonder v4.3: Control Dashboard with Real-time Logs & Gravity Filters
- */
-export const startDashboard = (sock) =>
-⋮----
-let onlyCriticalLogs = false; // Nuevo: Modo Crítico (solo errores)
-⋮----
-// Tracker de Usuarios Online (últimos 5 min)
-⋮----
-// Interceptar logs para enviarlos al dashboard y guardarlos en archivos
-⋮----
-const saveLogToFile = (type, msg) =>
-⋮----
-const emitLog = (type, args) =>
-⋮----
-// Guardado persistente (siempre activo)
-⋮----
-// Filtrado por gravedad para streaming
-⋮----
-// Enviar lista inicial de usuarios online
-⋮----
-console.log = (...args) =>
-⋮----
-console.warn = (...args) =>
-⋮----
-console.error = (...args) =>
-⋮----
-// Endpoint para registrar actividad de usuario desde messages.js
-⋮----
-// Limpiar usuarios inactivos (+5 min)
-</file>
-
-<file path="src/middlewares/intentHandler.js">
-// src/middlewares/intentHandler.js
-⋮----
-/**
- * Beyonder v4: NLU & Intent Middleware
- * Decide qué hacer con el mensaje antes de que llegue a los comandos.
- */
-export const processIntent = async (texto, isGroup, isAdmin, isOwner) =>
-⋮----
-// 1. Detección de Comandos Directos
-⋮----
-// 2. Detección de Ataques o Comportamiento Malicioso (Placeholder)
-⋮----
-// 3. Charla Casual o IA
-// Si no es comando, podría ser una mención a Beyonder o charla orgánica
-</file>
-
 <file path="src/classes/Economy.js">
 // src/classes/Economy.js
 ⋮----
@@ -310,95 +217,6 @@ async reduceEnergy(amount)
 getTension()
 ⋮----
 getEnergy()
-</file>
-
-<file path="src/classes/User.js">
-// src/classes/User.js
-⋮----
-/**
- * Beyonder v4: User Wrapper Class with Redis Caching
- * Centraliza la lógica de negocio del usuario y optimiza el rendimiento con Redis.
- */
-class User
-⋮----
-this.data = data; // Datos del modelo de Mongoose (lean object)
-⋮----
-// Lista global de usuarios "sucios" para sincronización periódica
-⋮----
-/**
-   * Obtiene un usuario de la DB o Caché y lo envuelve en la clase.
-   */
-static async get(jid, communityId)
-⋮----
-// 1. Intentar cargar desde Redis
-⋮----
-// 2. Si no está en Redis, cargar de MongoDB
-⋮----
-/**
-   * Crea o actualiza un usuario (upsert) y lo devuelve envuelto.
-   */
-static async findOrCreate(jid, communityId, extraData =
-⋮----
-/**
-   * Guarda los datos actuales en el caché de Redis.
-   */
-async saveToCache()
-⋮----
-/**
-   * Marca al usuario como "sucio" para que se sincronice con MongoDB después.
-   */
-markDirty()
-⋮----
-/**
-    * Sincroniza todos los usuarios "sucios" de Redis a MongoDB.
-    * Se recomienda llamar esto cada 5 minutos.
-    */
-static async syncAllToDB()
-⋮----
-User.dirtyUsers.clear(); // Limpiamos antes para capturar nuevos cambios durante el proceso
-⋮----
-// Usamos replaceOne para asegurar que el documento en Mongo sea EXACTAMENTE igual al de Redis
-⋮----
-// Si falla, lo devolvemos a la lista para el próximo intento
-⋮----
-// ── Métodos de Economía ────────────────────────────────────────────────────
-⋮----
-async addMoney(amount)
-⋮----
-// Sincronización inmediata para economía crítica (opcional)
-⋮----
-async removeMoney(amount)
-⋮----
-// ── Métodos de Mensajes y Afinidad ─────────────────────────────────────────
-⋮----
-async incrementMsgCount()
-⋮----
-// Aquí podríamos NO hacer update en Mongo de inmediato para ahorrar recursos
-// y dejar que el sync periódico lo haga cada 5 min.
-⋮----
-// ── Métodos de Permisos ────────────────────────────────────────────────────
-⋮----
-isOwner(ownerList = [])
-⋮----
-isMod()
-⋮----
-isHelper()
-⋮----
-// ── Métodos de Perfil ──────────────────────────────────────────────────────
-⋮----
-getPersonaje()
-⋮----
-getStats()
-⋮----
-// ── Métodos de Cooldowns ──────────────────────────────────────────────────
-⋮----
-getCooldown(key)
-⋮----
-async setCooldown(key, durationMs)
-⋮----
-isCooldownActive(key)
-⋮----
-getCooldownTimeLeft(key)
 </file>
 
 <file path="src/comandos/economia/impuesto.js">
@@ -617,6 +435,32 @@ export const handleGroupUpdate = async (updates, sock) =>
 // Reacción opcional
 </file>
 
+<file path="src/middlewares/intentHandler.js">
+// src/middlewares/intentHandler.js
+⋮----
+/**
+ * Beyonder v4.4: Analiza el sentimiento y emoción del mensaje usando Groq.
+ */
+export const analizarEmocion = async (texto) =>
+⋮----
+// 1. Intentar cargar desde Caché de Redis para ahorrar tokens
+⋮----
+// Guardar en Caché por 1 hora si es exitoso
+⋮----
+/**
+ * Beyonder v4: NLU & Intent Middleware
+ * Decide qué hacer con el mensaje antes de que llegue a los comandos.
+ */
+export const processIntent = async (texto, isGroup, isAdmin, isOwner) =>
+⋮----
+// 1. Detección de Comandos Directos
+⋮----
+// 2. Detección de Ataques o Comportamiento Malicioso (Placeholder)
+⋮----
+// 3. Charla Casual o IA
+// Si no es comando, podría ser una mención a Beyonder o charla orgánica
+</file>
+
 <file path="src/middlewares/permissions.js">
 // src/middlewares/permissions.js
 ⋮----
@@ -794,6 +638,136 @@ pinned: false
 
 # Beyond Squad API
 Esta es la API para el bot de WhatsApp.
+</file>
+
+<file path="src/classes/PluginLoader.js">
+// src/classes/PluginLoader.js
+⋮----
+/**
+ * Beyonder v4: Plugin & Command Loader
+ * Permite cargar, recargar y gestionar comandos dinámicamente con Hot-Reload.
+ */
+class PluginLoader
+⋮----
+/**
+   * Carga todos los comandos y activa el Hot-Reload.
+   */
+async loadAll()
+⋮----
+/**
+   * Inicia el observador de archivos para recarga automática.
+   */
+startWatcher()
+⋮----
+ignored: /(^|[\/\\])\../, // ignora archivos ocultos
+⋮----
+// Eliminar el comando y sus alias
+⋮----
+/**
+   * Carga un comando individual.
+   */
+async loadCommand(category, file)
+⋮----
+// Usar cache busting para permitir Hot-Reload (import dinámico con timestamp)
+⋮----
+/**
+   * Busca un comando por nombre o alias.
+   */
+getCommand(name)
+⋮----
+/**
+   * Recarga un comando específico manualmente si es necesario.
+   */
+async reloadCommand(name)
+</file>
+
+<file path="src/classes/User.js">
+// src/classes/User.js
+⋮----
+/**
+ * Beyonder v4: User Wrapper Class with Redis Caching
+ * Centraliza la lógica de negocio del usuario y optimiza el rendimiento con Redis.
+ */
+class User
+⋮----
+this.data = data; // Datos del modelo de Mongoose (lean object)
+⋮----
+// Lista global de usuarios "sucios" para sincronización periódica
+⋮----
+/**
+   * Obtiene un usuario de la DB o Caché y lo envuelve en la clase.
+   */
+static async get(jid, communityId)
+⋮----
+// 1. Intentar cargar desde Redis
+⋮----
+// 2. Si no está en Redis, cargar de MongoDB
+⋮----
+/**
+   * Crea o actualiza un usuario (upsert) y lo devuelve envuelto.
+   */
+static async findOrCreate(jid, communityId, extraData =
+⋮----
+/**
+   * Guarda los datos actuales en el caché de Redis.
+   */
+async saveToCache()
+⋮----
+/**
+   * Marca al usuario como "sucio" para que se sincronice con MongoDB después.
+   */
+markDirty()
+⋮----
+/**
+    * Sincroniza todos los usuarios "sucios" de Redis a MongoDB.
+    * Se recomienda llamar esto cada 5 minutos.
+    */
+static async syncAllToDB()
+⋮----
+User.dirtyUsers.clear(); // Limpiamos antes para capturar nuevos cambios durante el proceso
+⋮----
+// Usamos replaceOne para asegurar que el documento en Mongo sea EXACTAMENTE igual al de Redis
+⋮----
+// Si falla, lo devolvemos a la lista para el próximo intento
+⋮----
+// ── Métodos de Economía ────────────────────────────────────────────────────
+⋮----
+async addMoney(amount)
+⋮----
+// Sincronización inmediata para economía crítica (opcional)
+⋮----
+async removeMoney(amount)
+⋮----
+// ── Métodos de Mensajes y Afinidad ─────────────────────────────────────────
+⋮----
+async incrementMsgCount()
+⋮----
+// Aquí podríamos NO hacer update en Mongo de inmediato para ahorrar recursos
+// y dejar que el sync periódico lo haga cada 5 min.
+⋮----
+// ── Métodos de Permisos ────────────────────────────────────────────────────
+⋮----
+isOwner(ownerList = [])
+⋮----
+isMod()
+⋮----
+isHelper()
+⋮----
+// ── Métodos de Perfil ──────────────────────────────────────────────────────
+⋮----
+getPersonaje()
+⋮----
+getStats()
+⋮----
+// ── Métodos de Cooldowns ──────────────────────────────────────────────────
+⋮----
+getCooldown(key)
+⋮----
+async setCooldown(key, durationMs)
+⋮----
+isCooldownActive(key)
+⋮----
+getCooldownTimeLeft(key)
 </file>
 
 <file path="src/comandos/economia/cazar.js">
@@ -1167,6 +1141,47 @@ export const run = async (contexto) =>
 export const run = async (contexto) =>
 </file>
 
+<file path="src/dashboard/server.js">
+// src/dashboard/server.js
+⋮----
+/**
+ * Beyonder v4.3: Control Dashboard with Real-time Logs & Gravity Filters
+ */
+⋮----
+/**
+ * Beyonder v4.4: Exporta el estado de NLU para ser usado en el intentHandler
+ */
+export const isNluActive = ()
+⋮----
+export const startDashboard = (getSock) =>
+⋮----
+// Tracker de Usuarios Online (últimos 5 min)
+⋮----
+// Interceptar logs para enviarlos al dashboard y guardarlos en archivos
+⋮----
+const saveLogToFile = (type, msg) =>
+⋮----
+// Ignorar fallos de escritura en disco (por si HF Space es Read-Only)
+⋮----
+const emitLog = (type, args) =>
+⋮----
+// Guardado persistente (siempre activo)
+⋮----
+// Filtrado por gravedad para streaming
+⋮----
+// Enviar lista inicial de usuarios online
+⋮----
+console.log = (...args) =>
+⋮----
+console.warn = (...args) =>
+⋮----
+console.error = (...args) =>
+⋮----
+// Endpoint para registrar actividad de usuario desde messages.js
+⋮----
+// Limpiar usuarios inactivos (+5 min)
+</file>
+
 <file path="src/database/models/Affinity.js">
 // src/database/models/Affinity.js
 ⋮----
@@ -1411,21 +1426,6 @@ export const run = async (contexto) =>
 // 4. Responder con el JSON exacto y detalles de depuración
 </file>
 
-<file path="src/database/connection.js">
-// src/database/connection.js
-⋮----
-/**
- * Beyonder v4: Database Connection Manager
- * Gestiona MongoDB y la Capa de Caché con Redis.
- */
-⋮----
-const connectDB = async () =>
-⋮----
-// 1. Conectar a MongoDB
-⋮----
-// 2. Conectar a Redis (Caché)
-</file>
-
 <file path="src/database/models/Config.js">
 // src/database/models/Config.js
 ⋮----
@@ -1513,6 +1513,21 @@ user.cooldowns.slut = new Date(ahora.getTime() + 15 * MS_EN_MIN); // 15 min cool
 export const run = async (contexto) =>
 ⋮----
 // Se registra como owner en el grupo actual, lo que lo hace global
+</file>
+
+<file path="src/database/connection.js">
+// src/database/connection.js
+⋮----
+/**
+ * Beyonder v4: Database Connection Manager
+ * Gestiona MongoDB y la Capa de Caché con Redis.
+ */
+⋮----
+const connectDB = async () =>
+⋮----
+// 1. Conectar a MongoDB
+⋮----
+// 2. Conectar a Redis (Caché)
 </file>
 
 <file path="src/utils/format.js">
@@ -1647,58 +1662,6 @@ export const run = async (contexto) =>
 export const run = async (contexto) =>
 </file>
 
-<file path="package.json">
-{
-  "name": "beyonder-v3",
-  "version": "3.0.0",
-  "description": "Beyonder v3 — Roleplay, IA y Moderación Organizada",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js",
-    "start:hf": "concurrently \"uvicorn main:app --host 0.0.0.0 --port 7860\" \"node index.js\"",
-    "dev": "node --watch index.js"
-  },
-  "dependencies": {
-    "@gradio/client": "^1.6.0",
-    "@hapi/boom": "^10.0.1",
-    "@huggingface/inference": "^4.13.15",
-    "@tensorflow/tfjs-node": "^4.22.0",
-    "@whiskeysockets/baileys": "^6.7.9",
-    "axios": "^1.13.6",
-    "canvas": "^3.2.2",
-    "chokidar": "^5.0.0",
-    "concurrently": "^9.2.1",
-    "dotenv": "^16.4.5",
-    "express": "^5.2.1",
-    "ffmpeg-static": "^5.2.0",
-    "fluent-ffmpeg": "^2.1.3",
-    "form-data": "^4.0.5",
-    "groq-sdk": "^1.1.2",
-    "mongodb": "^7.1.1",
-    "mongoose": "^8.4.1",
-    "ollama": "^0.6.3",
-    "p-queue": "^9.1.0",
-    "pino": "^9.2.0",
-    "play-dl": "^1.9.7",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "redis": "^5.11.0",
-    "sharp": "^0.34.5",
-    "socket.io": "^4.8.3",
-    "uuid": "^13.0.0",
-    "wa-sticker-formatter": "^4.0.3",
-    "yt-search": "^2.13.1"
-  },
-  "devDependencies": {
-    "pino-pretty": "^11.2.1"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  }
-}
-</file>
-
 <file path="src/comandos/general/info.js">
 // src/comandos/general/info.js
 ⋮----
@@ -1721,6 +1684,59 @@ export const run = async (contexto) =>
 // Asegurar que dotenv lea el .env de la raíz, sin importar desde dónde se ejecute
 ⋮----
 // Asegurar que PHONE_NUMBER sea un string limpio o null
+</file>
+
+<file path="package.json">
+{
+  "name": "beyonder-v3",
+  "version": "3.0.0",
+  "description": "Beyonder v3 — Roleplay, IA y Moderación Organizada",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "concurrently \"uvicorn main:app --host 0.0.0.0 --port 8000\" \"node index.js\"",
+    "start:hf": "concurrently \"uvicorn main:app --host 0.0.0.0 --port 8000\" \"node index.js\"",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@gradio/client": "^1.6.0",
+    "@hapi/boom": "^10.0.1",
+    "@huggingface/inference": "^4.13.15",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.13.6",
+    "canvas": "^3.2.2",
+    "chokidar": "^5.0.0",
+    "concurrently": "^9.2.1",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "form-data": "^4.0.5",
+    "groq-sdk": "^1.1.2",
+    "mongodb": "^7.1.1",
+    "mongoose": "^8.4.1",
+    "node-fetch": "^3.3.2",
+    "ollama": "^0.6.3",
+    "p-queue": "^9.1.0",
+    "pino": "^9.2.0",
+    "play-dl": "^1.9.7",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "redis": "^5.11.0",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0",
+    "wa-sticker-formatter": "^4.0.3",
+    "yt-search": "^2.13.1"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
 </file>
 
 <file path="src/database/models/User.js">
@@ -1761,56 +1777,6 @@ timestamps: true, // agrega createdAt y updatedAt automáticamente
 // ─── Índices adicionales ─────────────────────────────────────────────────────
 ⋮----
 // ─── Modelo ───────────────────────────────────────────────────────────────────
-</file>
-
-<file path="src/utils/detector.js">
-/**
- * detector.js — Cliente HTTP para el servidor de IA (FastAPI)
- * Envía imágenes al servidor local para análisis ultra rápido.
- */
-⋮----
-// ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
-⋮----
-const AI_CLIP_URL   = `${AI_BASE_URL}/detect/clip`; // Nueva ruta para CLIP puro
-⋮----
-// ... (NSFW_THRESHOLDS same)
-⋮----
-/**
- * Analiza una imagen con CLIP para obtener etiquetas descriptivas.
- * También identifica si el contenido es "morboso" o sugerente.
- */
-export async function analyzeWithClip(buffer)
-⋮----
-// Lógica de detección de morbo (Picardía)
-⋮----
-// ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
-⋮----
-/**
- * Escanea una imagen solo en busca de NSFW (NudeNet)
- */
-export async function scanNsfw(buffer)
-⋮----
-/**
- * Escanea una imagen solo en busca de Gore (CLIP)
- */
-export async function scanGore(buffer)
-⋮----
-// CLIP también puede detectar NSFW como backup
-⋮----
-/**
- * Analiza una imagen enviándola al servidor FastAPI.
- * Mantiene compatibilidad con el código anterior.
- */
-export async function analyzeImage(buffer)
-⋮----
-// 1. Procesar detecciones NudeNet (NSFW)
-⋮----
-// 2. Procesar Detección CLIP Extra (Pornografía)
-⋮----
-// Mantener compatibilidad
-export const detectNsfw = async (buffer) =>
-⋮----
-export const detectGore = async (buffer) =>
 </file>
 
 <file path="src/services/iaService.js">
@@ -1874,6 +1840,61 @@ export const getAiResponse = async (sender, from, communityId, userName, message
 // 7.5 Limpieza de estilo (quitar puntos finales)
 ⋮----
 // 8. Detección de acciones (Bautizo)
+</file>
+
+<file path="src/utils/detector.js">
+/**
+ * detector.js — Cliente HTTP para el servidor de IA (FastAPI)
+ * Envía imágenes al servidor local para análisis ultra rápido.
+ */
+⋮----
+// ── CONFIGURACIÓN INTERNA (HUGGING FACE / LOCAL) ──────────────────────────────
+⋮----
+const AI_CLIP_URL   = `${AI_BASE_URL}/detect/clip`; // Nueva ruta para CLIP puro
+⋮----
+/**
+ * Helper para reintentar peticiones HTTP al servidor de IA
+ */
+const axiosWithRetry = async (config, retries = 3, delay = 2000) =>
+⋮----
+// ... (NSFW_THRESHOLDS same)
+⋮----
+/**
+ * Analiza una imagen con CLIP para obtener etiquetas descriptivas.
+ * También identifica si el contenido es "morboso" o sugerente.
+ */
+export async function analyzeWithClip(buffer)
+⋮----
+// Lógica de detección de morbo (Picardía)
+⋮----
+// ── CONFIGURACIÓN DE UMBRALES (NudeNet) ──────────────────────────────────────
+⋮----
+/**
+ * Escanea una imagen solo en busca de NSFW (NudeNet)
+ */
+export async function scanNsfw(buffer)
+⋮----
+/**
+ * Escanea una imagen solo en busca de Gore (CLIP)
+ */
+export async function scanGore(buffer)
+⋮----
+// CLIP también puede detectar NSFW como backup
+⋮----
+/**
+ * Analiza una imagen enviándola al servidor FastAPI.
+ * Mantiene compatibilidad con el código anterior.
+ */
+export async function analyzeImage(buffer)
+⋮----
+// 1. Procesar detecciones NudeNet (NSFW)
+⋮----
+// 2. Procesar Detección CLIP Extra (Pornografía)
+⋮----
+// Mantener compatibilidad
+export const detectNsfw = async (buffer) =>
+⋮----
+export const detectGore = async (buffer) =>
 </file>
 
 <file path="src/events/messages.js">
@@ -2023,7 +2044,14 @@ continue; // No procesar más este mensaje si ya respondimos sobre el apodo
 ⋮----
 // ── 8. Manejo de Comandos (Beyonder v4: NLU Middleware) ──────────────
 ⋮----
-// Pasar a IA con personalidad de Beyonder
+// ── 8.1 Procesar Análisis Emocional Automático (v4.4 con Groq) ──
+⋮----
+// Ajuste de afinidad automático (v4.4)
+if (analisis.emocion === 'agresivo') await u.removeMoney(50); // Multa por ser agresivo
+⋮----
+continue; // Detener flujo para que no responda doble
+⋮----
+// Pasar a IA con personalidad de Beyonder (Fallback o respuesta normal)
 ⋮----
 // ── 8.5 Verificación de Economía Activa ───────────────────────────
 ⋮----

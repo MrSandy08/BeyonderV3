@@ -1,5 +1,6 @@
 // src/classes/User.js
 import UserSchema from "../database/models/User.js";
+import AffinitySchema from "../database/models/Affinity.js";
 import { redisClient } from "../database/connection.js";
 
 /**
@@ -31,9 +32,14 @@ class User {
     }
 
     // 2. Si no está en Redis, cargar de MongoDB
-    const data = await UserSchema.findOne({ jid, communityId }).lean();
-    if (!data) return null;
+    const [userData, affData] = await Promise.all([
+      UserSchema.findOne({ jid, communityId }).lean(),
+      AffinitySchema.findOne({ jid, communityId }).lean()
+    ]);
 
+    if (!userData) return null;
+
+    const data = { ...userData, affinity: affData || { points: 0, interactions: 0 } };
     const user = new User(data);
     await user.saveToCache();
     return user;
@@ -45,11 +51,19 @@ class User {
   static async findOrCreate(jid, communityId, extraData = {}) {
     let user = await User.get(jid, communityId);
     if (!user) {
-      const data = await UserSchema.findOneAndUpdate(
-        { jid, communityId },
-        { $setOnInsert: extraData },
-        { upsert: true, new: true, lean: true }
-      );
+      const [userData, affData] = await Promise.all([
+        UserSchema.findOneAndUpdate(
+          { jid, communityId },
+          { $setOnInsert: extraData },
+          { upsert: true, new: true, lean: true }
+        ),
+        AffinitySchema.findOneAndUpdate(
+          { jid, communityId },
+          { $setOnInsert: { points: 0, interactions: 0 } },
+          { upsert: true, new: true, lean: true }
+        )
+      ]);
+      const data = { ...userData, affinity: affData };
       user = new User(data);
       await user.saveToCache();
     }
@@ -94,12 +108,26 @@ class User {
          const cached = await redisClient.get(cacheKey);
          if (cached) {
            const data = JSON.parse(cached);
-           // Usamos replaceOne para asegurar que el documento en Mongo sea EXACTAMENTE igual al de Redis
+           
+           // Separar datos de afinidad para no ensuciar la colección de usuarios
+           const { affinity, ...userData } = data;
+
+           // 1. Sincronizar Usuario
            await UserSchema.replaceOne(
              { jid: data.jid, communityId: data.communityId },
-             data,
+             userData,
              { upsert: true }
            );
+
+           // 2. Sincronizar Afinidad (si existe en el caché)
+           if (affinity) {
+             await AffinitySchema.replaceOne(
+               { jid: data.jid, communityId: data.communityId },
+               { jid: data.jid, communityId: data.communityId, ...affinity },
+               { upsert: true }
+             );
+           }
+
            success++;
          }
        } catch (e) {
@@ -139,7 +167,32 @@ class User {
     );
   }
 
-  // ── Métodos de Mensajes y Afinidad ─────────────────────────────────────────
+  // ── Métodos de Afinidad ────────────────────────────────────────────────────
+
+  async addAffinity(points) {
+    if (!this.data.affinity) this.data.affinity = { points: 0, interactions: 0 };
+    this.data.affinity.points = Math.min(100, Math.max(-100, (this.data.affinity.points || 0) + points));
+    this.data.affinity.interactions = (this.data.affinity.interactions || 0) + 1;
+    this.data.affinity.lastInteraction = new Date();
+    
+    this.markDirty();
+    await this.saveToCache();
+    
+    // Sincronización inmediata para afinidad (opcional, pero recomendada por el usuario)
+    return await AffinitySchema.updateOne(
+      { jid: this.jid, communityId: this.communityId },
+      { 
+        $set: { 
+          points: this.data.affinity.points,
+          interactions: this.data.affinity.interactions,
+          lastInteraction: this.data.affinity.lastInteraction
+        } 
+      },
+      { upsert: true }
+    );
+  }
+
+  // ── Métodos de Mensajes ─────────────────────────────────────────
 
   async incrementMsgCount() {
     this.data.msgCount = (this.data.msgCount || 0) + 1;

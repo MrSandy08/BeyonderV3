@@ -55,8 +55,9 @@ export async function shouldRespondOrganically(contexto) {
   if (tension > 70) interes += 6;
 
   // 6. Decisión Final basada en Interés vs Afinidad
+  // Beyonder v4.5.5: Umbrales aumentados para evitar "spam" de respuestas
   // A mayor afinidad, menos interés requiere para responder
-  const umbralInteres = afinidad > 80 ? 3 : (afinidad > 40 ? 6 : 9);
+  const umbralInteres = afinidad > 90 ? 5 : (afinidad > 50 ? 8 : 12);
 
   return interes >= umbralInteres;
 }

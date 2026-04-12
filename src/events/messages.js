@@ -317,23 +317,12 @@ const handleMessages = async ({ messages, type }, sock) => {
 
         if (u) {
           await u.incrementMsgCount();
+          // Actualizar Afinidad e Interacciones usando la clase (v4.5.5)
+          await u.addAffinity(0.1);
+          
           // Registrar actividad en el Dashboard (v4.3)
           axios.post(`http://localhost:${config.PORT}/api/user-activity`, { jid: sender, name: userName }).catch(() => {});
         }
-
-        // Actualizar Afinidad e Interacciones
-        await Affinity.findOneAndUpdate(
-          { jid: sender, communityId: communityId },
-          { 
-            $inc: { points: 0.1, interactions: 1 }, 
-            $set: { lastInteraction: new Date() } 
-          },
-          { upsert: true }
-        ).catch(e => {
-          if (e.code !== 11000) {
-            console.error("❌ Error DB Afinidad:", e.message);
-          }
-        });
 
         // ── 1.1. Monitoreo de Tensión y "Peleas" ──
         if (isGroup) {
@@ -675,9 +664,14 @@ const handleMessages = async ({ messages, type }, sock) => {
                 gifPlayback: true 
               }, { quoted: msg });
 
-              // Ajuste de afinidad automático (v4.4)
-              if (analisis.emocion === 'agresivo') await u.removeMoney(50); // Multa por ser agresivo
-              if (analisis.emocion === 'amistoso') await Affinity.updateOne({ jid: sender, communityId }, { $inc: { points: 2 } });
+              // Ajuste de afinidad automático (v4.4 / v4.5.5)
+              if (analisis.emocion === 'agresivo') {
+                await u.removeMoney(50); // Multa por ser agresivo
+                await u.addAffinity(-3);
+              }
+              if (analisis.emocion === 'amistoso') {
+                await u.addAffinity(2);
+              }
               
               continue; // Detener flujo para que no responda doble
             } catch (e) {

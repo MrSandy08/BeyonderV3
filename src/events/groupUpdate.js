@@ -65,8 +65,14 @@ export const handleGroupParticipantsUpdate = async (update, sock) => {
       );
 
       // ── REACCIÓN ORGÁNICA DE BEYONDER ──
-      // Solo reacciona si el evento es importante (afinidad alta/baja o expulsión)
-      if (Math.abs(rel?.points || 0) > 30 || action === "remove") {
+      // Beyonder v4.5.5: Solo reacciona si el evento involucra a alguien conocido (amigo o enemigo)
+      // Ignorar fantasmas (afinidad 0 o inexistente) y neutrales (entre -30 y 30)
+      const afinidad = rel?.points || 0;
+      if (afinidad > -30 && afinidad < 30) {
+        return; 
+      }
+
+      if (Math.abs(afinidad) > 30 || action === "remove") {
         const situation = `Evento de grupo: ${eventDesc}. Mi relación con ${userName} era de ${rel?.points || 0}/100.`;
         const { text: response } = await getAiResponse(
           "SISTEMA", 

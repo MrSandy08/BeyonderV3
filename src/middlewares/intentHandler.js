@@ -64,20 +64,26 @@ export const analizarEmocion = async (texto) => {
  */
 export const processIntent = async (texto, isGroup, isAdmin, isOwner) => {
   const body = texto.trim();
-  const isCmd = body.startsWith(config.PREFIX);
+  const prefix = config.PREFIX;
+  const isCmd = body.startsWith(prefix);
+
+  console.log(`[NLU] Procesando: "${body.slice(0, 20)}..." | isCmd: ${isCmd} | Prefix: "${prefix}"`);
 
   // 1. Detección de Comandos Directos
   if (isCmd) {
-    const commandName = body.slice(config.PREFIX.length).split(/\s+/)[0].toLowerCase();
+    const commandName = body.slice(prefix.length).split(/\s+/)[0].toLowerCase();
     const command = pluginLoader.getCommand(commandName);
     
     if (command) {
+      console.log(`[NLU] Comando detectado: ${commandName}`);
       return {
         type: "command",
         name: commandName,
         command: command,
         args: body.split(/\s+/).slice(1)
       };
+    } else {
+      console.warn(`[NLU] Prefijo detectado pero comando no encontrado: ${commandName}`);
     }
   }
 

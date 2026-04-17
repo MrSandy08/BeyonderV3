@@ -499,7 +499,134 @@ const handleMessages = async ({ messages, type }, sock) => {
         }
       }
 
-      // ── 7. Disparador de IA (Si no es comando) ─────────────────────────
+      // ── 7. Disparador de Comandos (Prioridad Alta) ──────────────────────
+      const intent = await processIntent(texto, isGroup, isAdmin, isOwner);
+      let commandExecuted = false;
+
+      if (intent.type === "command") {
+        const { command, args, name } = intent;
+        const text = args.join(" ");
+
+        // ── 8.5 Verificación de Economía Activa ───────────────────────────
+        const ECO_CMDS = [
+          "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
+          "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
+          "extort", "cultivar", "cosechar", "plantar",
+          "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
+          "depositar", "retirar", "fianza", "claim", "reclamar", "regalo", "impuesto"
+        ];
+
+        if (!(ECO_CMDS.includes(name) && isGroup && cfg && cfg.economyActive === false)) {
+          const { run, onlyAdmin, onlyMod, onlyOwner } = command;
+          
+          if (!u) {
+            console.error("❌ [v4] El usuario no pudo ser cargado o creado. Abortando comando.");
+          } else {
+            const userIsMod = isAdmin && (u.isMod() || isOwner);
+
+            // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────
+            let canRun = true;
+            if (u.data.isJailed) {
+              const ahora = new Date();
+              const jailUntil = new Date(u.data.jailUntil);
+              if (jailUntil > ahora) {
+                if (ECO_CMDS.includes(name)) {
+                  const restante = Math.ceil((jailUntil - ahora) / 60000);
+                  await sock.sendMessage(from, { 
+                    text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes realizar actividades económicas mientras cumples tu condena.\n       𝄄   _Tiempo restante: ${restante} minutos_\n       𝄄   _Usa *!fianza* para salir inmediatamente._` 
+                  }, { quoted: msg });
+                  canRun = false;
+                }
+              } else {
+                await User.updateOne({ jid: sender, communityId }, { $set: { isJailed: false, jailUntil: null } });
+                u.data.isJailed = false;
+              }
+            }
+
+            if (canRun) {
+              let tienePermiso = true;
+              let motivo       = "";
+
+              if      (onlyOwner && !isOwner)              { tienePermiso = false; motivo = "⛔ Solo *Owners* pueden usar este comando."; }
+              else if (onlyMod   && !userIsMod && !isOwner) { tienePermiso = false; motivo = "⛔ Solo *Moderadores* u Owners pueden usar este comando."; }
+              else if (onlyAdmin && !isAdmin && !isOwner)   { tienePermiso = false; motivo = "⛔ Solo *Admins* del grupo pueden usar este comando."; }
+
+              if (!tienePermiso) {
+                await sock.sendMessage(from, { text: motivo }, { quoted: msg });
+              } else {
+                // Sumar fatiga por comando
+                if (["mine", "fish", "reporte"].includes(name)) {
+                  addFatigue(10);
+                }
+
+                const contexto = {
+                  msg, sock, sender, from, args, isGroup, command: name, text,
+                  remoteJid: from,
+                  communityId,
+                  isWAAdmin:  isAdmin,
+                  isMod:      userIsMod,
+                  isOwner:    isOwner,
+                  permisos:   isOwner ? 3 : (u.data.permisos || 0),
+                  cfg:        cfg || {},
+                  meta,
+                  config,
+                  user:       u,
+                  mentionedJids: msg.message?.[mtype]?.contextInfo?.mentionedJid ?? [],
+                  reply:  async (text, mentions = []) => {
+                    for (let i = 0; i < 3; i++) {
+                      try {
+                        if (!sock || !sock.ev) return;
+                        return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+                      } catch (e) {
+                        if (e.message?.includes('Connection Closed')) return;
+                        if (i === 2) throw e;
+                        await new Promise(r => setTimeout(r, 1000));
+                      }
+                    }
+                  },
+                  send:   async (text, mentions = []) => {
+                    for (let i = 0; i < 3; i++) {
+                      try {
+                        if (!sock || !sock.ev) return;
+                        return await sock.sendMessage(from, { text, mentions });
+                      } catch (e) {
+                        if (e.message?.includes('Connection Closed')) return;
+                        if (i === 2) throw e;
+                        await new Promise(r => setTimeout(r, 1000));
+                      }
+                    }
+                  },
+                  react:  async (emoji) => {
+                    for (let i = 0; i < 3; i++) {
+                      try {
+                        if (!sock || !sock.ev) return;
+                        return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
+                      } catch (e) {
+                        if (e.message?.includes('Connection Closed')) return;
+                        if (i === 2) throw e;
+                        await new Promise(r => setTimeout(r, 1000));
+                      }
+                    }
+                  },
+                };
+
+                try {
+                  console.log(`[EXEC] Ejecutando comando !${name} por @${sender.split("@")[0]}`);
+                  await run(contexto);
+                  commandExecuted = true;
+                } catch (err) {
+                  console.error(`❌ Error en comando !${name}:`, err.message);
+                  await sock.sendMessage(from, { text: `❌ Error al ejecutar !${name}: ${err.message}` }, { quoted: msg }).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (commandExecuted) continue;
+
+      // ── 8. Disparador de IA (Si no es comando o falló ejecución) ──────────
       const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
       const isMentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botId);
       const isReplyToBot = msg.message?.extendedTextMessage?.contextInfo?.participant === botId;
@@ -555,10 +682,12 @@ const handleMessages = async ({ messages, type }, sock) => {
           // Si está tranquila o es mención directa, responde.
           if (!isConversationFast || isMencionDirecta) {
             await sock.sendMessage(from, { text: reason }, { quoted: msg });
-            continue; // No procesar más este mensaje si ya respondimos sobre el apodo
+            commandExecuted = true; // Marcamos como "respondido" para no seguir
           }
         }
       }
+
+      if (commandExecuted) continue;
 
       const debeHablar = !isCmd && cfg?.esPrincipal && await shouldRespondOrganically({
         sender, communityId, isGroup, isMencionDirecta, isMorboso, texto, visualTags
@@ -633,9 +762,7 @@ const handleMessages = async ({ messages, type }, sock) => {
           continue;
         }
 
-      // ── 8. Manejo de Comandos (Beyonder v4: NLU Middleware) ──────────────
-      const intent = await processIntent(texto, isGroup, isAdmin, isOwner);
-
+      // ── 9. Fallback: Intent Handler NLU (Chat casual) ───────────────────
       if (intent.type === "ignore") {
         if (await handleSearchSelection(sock, msg, from, sender, texto)) continue;
         continue;
@@ -648,7 +775,7 @@ const handleMessages = async ({ messages, type }, sock) => {
       }
 
       if (intent.type === "chat") {
-        // ── 8.1 Procesar Análisis Emocional Automático (v4.4 con Groq) ──
+        // ── 9.1 Procesar Análisis Emocional Automático (v4.4 con Groq) ──
         if (intent.text.length > 2) {
           const analisis = await analizarEmocion(intent.text);
           
@@ -684,130 +811,6 @@ const handleMessages = async ({ messages, type }, sock) => {
         const { text: response } = await getAiResponse(sender, from, communityId, userName, intent.text, [], false);
         if (response) await sock.sendMessage(from, { text: response }, { quoted: msg });
         continue;
-      }
-
-      if (intent.type === "command") {
-        const { command, args, name } = intent;
-        const text = args.join(" ");
-
-        // ── 8.5 Verificación de Economía Activa ───────────────────────────
-        const ECO_CMDS = [
-          "work", "trabajar", "slut", "puta", "minar", "mine", "pescar", "fish", 
-          "cazar", "hunt", "atracar", "rob", "robar", "asalto", "extorsionar", 
-          "extort", "cultivar", "cosechar", "plantar",
-          "crimen", "suerte", "ricos", "topricos", "millonarios", "topmoney",
-          "depositar", "retirar", "fianza", "claim", "reclamar", "regalo", "impuesto"
-        ];
-
-        if (ECO_CMDS.includes(name) && isGroup && cfg && cfg.economyActive === false) {
-          continue;
-        }
-
-        const { run, onlyAdmin, onlyMod, onlyOwner } = command;
-        
-        if (!u) {
-          console.error("❌ [v4] El usuario no pudo ser cargado o creado. Abortando comando.");
-          continue;
-        }
-
-        const userIsMod = isAdmin && (u.isMod() || isOwner);
-
-        // ── 9. Verificación de Cárcel (Solo bloquea economía) ───────────────
-        if (u.data.isJailed) {
-          const ahora = new Date();
-          const jailUntil = new Date(u.data.jailUntil);
-          if (jailUntil > ahora) {
-            if (ECO_CMDS.includes(name)) {
-              const restante = Math.ceil((jailUntil - ahora) / 60000);
-              await sock.sendMessage(from, { 
-                text: `⛓️ *ESTÁS EN LA CÁRCEL*\n\nNo puedes realizar actividades económicas mientras cumples tu condena.\n       𝄄   _Tiempo restante: ${restante} minutos_\n       𝄄   _Usa *!fianza* para salir inmediatamente._` 
-              }, { quoted: msg });
-              continue;
-            }
-          } else {
-            // Si el tiempo expiró, liberar automáticamente
-            await User.updateOne({ jid: sender, communityId }, { $set: { isJailed: false, jailUntil: null } });
-            u.data.isJailed = false;
-          }
-        }
-
-        let tienePermiso = true;
-        let motivo       = "";
-
-        if      (onlyOwner && !isOwner)              { tienePermiso = false; motivo = "⛔ Solo *Owners* pueden usar este comando."; }
-        else if (onlyMod   && !userIsMod && !isOwner) { tienePermiso = false; motivo = "⛔ Solo *Moderadores* u Owners pueden usar este comando."; }
-        else if (onlyAdmin && !isAdmin && !isOwner)   { tienePermiso = false; motivo = "⛔ Solo *Admins* del grupo pueden usar este comando."; }
-
-        if (!tienePermiso) {
-          await sock.sendMessage(from, { text: motivo }, { quoted: msg });
-          continue;
-        }
-
-        // Sumar fatiga por comando
-        if (["mine", "fish", "reporte"].includes(name)) {
-          addFatigue(10);
-        }
-
-        const contexto = {
-          msg, sock, sender, from, args, isGroup, command: name, text,
-          remoteJid: from,
-          communityId,
-          isWAAdmin:  isAdmin,
-          isMod:      userIsMod,
-          isOwner:    isOwner,
-          permisos:   isOwner ? 3 : (u.data.permisos || 0),
-          cfg:        cfg || {},
-          meta,
-          config,
-          user:       u, // Pasar el objeto User de la v4
-          mentionedJids: msg.message?.[mtype]?.contextInfo?.mentionedJid ?? [],
-          reply:  async (text, mentions = []) => {
-            for (let i = 0; i < 3; i++) {
-              try {
-                if (!sock || !sock.ev) return;
-                return await sock.sendMessage(from, { text, mentions }, { quoted: msg });
-              } catch (e) {
-                if (e.message?.includes('Connection Closed')) {
-                  console.warn(`⚠️ Intento de envío fallido: Conexión cerrada. Deteniendo reintentos.`);
-                  return;
-                }
-                if (i === 2) throw e;
-                await new Promise(r => setTimeout(r, 1000));
-              }
-            }
-          },
-          send:   async (text, mentions = []) => {
-            for (let i = 0; i < 3; i++) {
-              try {
-                if (!sock || !sock.ev) return;
-                return await sock.sendMessage(from, { text, mentions });
-              } catch (e) {
-                if (e.message?.includes('Connection Closed')) return;
-                if (i === 2) throw e;
-                await new Promise(r => setTimeout(r, 1000));
-              }
-            }
-          },
-          react:  async (emoji) => {
-            for (let i = 0; i < 3; i++) {
-              try {
-                if (!sock || !sock.ev) return;
-                return await sock.sendMessage(from, { react: { text: emoji, key: msg.key } });
-              } catch (e) {
-                if (e.message?.includes('Connection Closed')) return;
-                if (i === 2) throw e;
-                await new Promise(r => setTimeout(r, 1000));
-              }
-            }
-          },
-        };
-
-        try {
-          await run(contexto);
-        } catch (err) {
-          console.error(`❌ Error en comando !${name}:`, err.message);
-          await sock.sendMessage(from, { text: `❌ Error al ejecutar !${name}: ${err.message}` }, { quoted: msg }).catch(() => {});
-        }
       }
 
     } catch (err) {

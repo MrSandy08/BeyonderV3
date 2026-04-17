@@ -17,8 +17,8 @@ export const run = async (contexto) => {
   
   const history = chatHistories.get(from) || [];
   
-  // Forzamos la respuesta (100% probabilidad)
-  const { text: aiText } = await getAiResponse(sender, from, userName, text, history, true);
+  // Forzamos la respuesta (100% probabilidad) - Corregido el orden de argumentos (v4.6)
+  const { text: aiText } = await getAiResponse(sender, from, communityId, userName, text, history, true);
   
   // Guardar en historial
   history.push({ role: "user", content: text });

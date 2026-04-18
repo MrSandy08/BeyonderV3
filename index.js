@@ -176,28 +176,35 @@ const conectarWhatsApp = async () => {
 //     Orden garantizado: BD → Comandos → WhatsApp
 // ════════════════════════════════════════════════════════════════════════════
 const main = async () => {
-  console.log("🚀 Iniciando Beyonder v3...\n");
+  console.log("🚀 Iniciando Beyonder v4 (HF Spaces Optimized)...\n");
 
-  // 1. Base de datos primero — si falla, el proceso termina (ver connection.js)
-  console.log("Intentando conectar a DB...");
-  if (MONGO_URI.includes("127.0.0.1") || MONGO_URI.includes("localhost")) {
-    console.log("ℹ️ Usando conexión local.");
-  } else {
-    console.log("✅ Detectada variable MONGO_URI externa.");
+  try {
+    // 1. Iniciar Dashboard INMEDIATAMENTE
+    // HF Spaces mata el contenedor si el puerto 7860 no abre en < 60s.
+    console.log("🌐 [1/4] Abriendo puerto 7860 (Dashboard)...");
+    startDashboard(() => currentSock);
+
+    // 2. Base de datos (con timeout de seguridad)
+    console.log("📂 [2/4] Conectando a MongoDB & Redis...");
+    if (!MONGO_URI) {
+      console.error("❌ ERROR: MONGO_URI no configurada en las Secret Vars de HF.");
+      process.exit(1);
+    }
+    await connectDB();
+
+    // 3. Carga de Plugins en paralelo (Optimización v4.6)
+    console.log("📂 [3/4] Cargando comandos...");
+    await pluginLoader.loadAll();
+
+    // 4. Conectar a WhatsApp
+    console.log("📲 [4/4] Iniciando socket de WhatsApp...");
+    await conectarWhatsApp();
+
+  } catch (err) {
+    console.error("❌ ERROR CRÍTICO DURANTE EL ARRANQUE:", err.message);
+    // En HF Spaces es mejor no salir para que el Dashboard siga vivo y podamos ver el error en el log web
+    // Pero si no hay conexión a DB, el bot no sirve de nada.
   }
-  await connectDB();
-
-  // 2. Cargar todos los comandos antes de abrir el socket
-  console.log("📂 Cargando comandos con Hot-Reload...");
-  await pluginLoader.loadAll();
-
-  // 3. Iniciar Dashboard inmediatamente (v4.5.1 para HF Spaces)
-  // Pasamos una función que devuelve el socket actual
-  console.log("🌐 Iniciando Dashboard de control...");
-  startDashboard(() => currentSock);
-
-  // 4. Conectar a WhatsApp
-  await conectarWhatsApp();
 };
 
 main();

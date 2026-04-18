@@ -29,15 +29,17 @@ class PluginLoader {
     }
 
     const categories = fs.readdirSync(this.pluginsPath);
-    for (const category of categories) {
+    
+    // Carga paralela de categorías para acelerar el arranque en HF Spaces
+    await Promise.all(categories.map(async (category) => {
       const categoryPath = join(this.pluginsPath, category);
-      if (!fs.statSync(categoryPath).isDirectory()) continue;
+      if (!fs.statSync(categoryPath).isDirectory()) return;
 
       const files = fs.readdirSync(categoryPath).filter(f => f.endsWith(".js"));
-      for (const file of files) {
-        await this.loadCommand(category, file);
-      }
-    }
+      
+      // Carga paralela de archivos dentro de cada categoría
+      await Promise.all(files.map(file => this.loadCommand(category, file)));
+    }));
     
     this.startWatcher();
     console.log(`🚀 [v4] ${this.commands.size} comandos cargados con Hot-Reload activo.`);

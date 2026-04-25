@@ -13,6 +13,7 @@ export const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "mo
 export const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 export const PORT = process.env.PORT || 7860;
 export const PREFIX = process.env.PREFIX || "!";
+export const COMMUNITY_ID = process.env.COMMUNITY_ID || "global";
 export const OWNERS = process.env.OWNER_JID
   ? process.env.OWNER_JID.split(",").map((jid) => jid.trim())
   : [];

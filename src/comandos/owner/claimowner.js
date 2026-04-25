@@ -2,7 +2,7 @@
 import User from "../../database/models/User.js";
 import { aviso } from "../../utils/format.js";
 
-export const name      = "claim";
+export const name      = "claimowner";
 export const aliases   = ["reclamar"];
 export const onlyAdmin = false;
 export const onlyMod   = false;

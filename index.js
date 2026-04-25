@@ -161,9 +161,6 @@ const conectarWhatsApp = async () => {
     // ── 3. SISTEMA DE INICIATIVA (Cada 1 hora) ───────────────────────────────
     setInterval(() => checkGroupInactivity(sock), 60 * 60 * 1000);
 
-    // ── 4. SINCRONIZACIÓN REDIS -> MONGO (Cada 5 minutos) ────────────────────
-    setInterval(() => UserClass.syncAllToDB(), 5 * 60 * 1000);
-
     return sock;
   } catch (err) {
     console.error("❌ Error fatal en conectarWhatsApp:", err.message);
@@ -192,9 +189,9 @@ const main = async () => {
     }
     await connectDB();
 
-    // 3. Carga de Plugins en paralelo (Optimización v4.6)
-    console.log("📂 [3/4] Cargando comandos...");
-    await pluginLoader.loadAll();
+    // 3. Inicializar Core V4 (Carga de Comandos, Schedulers, Módulos)
+    console.log("📂 [3/4] Inicializando Core Beyonder V4...");
+    await init();
 
     // 4. Conectar a WhatsApp
     console.log("📲 [4/4] Iniciando socket de WhatsApp...");

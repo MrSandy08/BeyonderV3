@@ -1,12 +1,10 @@
-from fastapi import FastAPI, File, UploadFile, Body, Response
+from fastapi import FastAPI, File, UploadFile, Response
 from fastapi.responses import FileResponse
 from nudenet import NudeDetector
 import os
-import shutil
 import torch
 import clip
-from PIL import Image, ImageOps, ImageEnhance
-import io
+from PIL import Image, ImageEnhance
 import time
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from pydantic import BaseModel
@@ -19,47 +17,106 @@ hf_token = os.getenv("HF_TOKEN")
 
 @app.get("/")
 async def read_root():
-    """Interfaz simple para HF Spaces"""
+    """Interfaz dinámica para HF Spaces: QR, Pairing o Estado"""
+    # 1. Si hay un QR activo, mostrarlo
     if os.path.exists("qr.png"):
         return Response(content="""
         <html>
-            <head><title>Beyonder v3 - QR</title></head>
-            <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
-                <h1>📱 Beyonder v3</h1>
-                <p>Escanea este código con tu WhatsApp para iniciar sesión.</p>
-                <img src="/qr" style="border: 10px solid white; border-radius: 10px; background: white;" />
-                <p style="margin-top: 20px; color: #888;">Si ya lo escaneaste, espera a que el bot se conecte.</p>
+            <head>
+                <title>Beyonder v4 - QR Setup</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { text-align: center; font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding-top: 50px; }
+                    .card { background: #111; border: 1px solid #333; padding: 30px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                    h1 { color: #00ff88; margin-bottom: 10px; }
+                    img { border: 10px solid white; border-radius: 15px; background: white; margin: 20px 0; max-width: 90%; }
+                    .footer { margin-top: 30px; color: #666; font-size: 0.9em; }
+                    .status-dot { height: 10px; width: 10px; background-color: #00ff88; border-radius: 50%; display: inline-block; margin-right: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>📱 Beyonder v4</h1>
+                    <p><span class="status-dot"></span> Esperando vinculación...</p>
+                    <p>Escanea este código con tu WhatsApp para iniciar sesión.</p>
+                    <img src="/qr" />
+                    <p style="color: #aaa;">Asegúrate de tener la base de datos conectada.</p>
+                </div>
+                <div class="footer">
+                    <p>Beyonder Engine v4.0 | HF Spaces Optimized</p>
+                </div>
                 <script>setInterval(() => location.reload(), 10000);</script>
             </body>
         </html>
         """, media_type="text/html")
     
+    # 2. Si hay un código de vinculación activo
     if os.path.exists("pairing.txt"):
-        with open("pairing.txt", "r") as f:
-            code = f.read().strip()
-        return Response(content=f"""
-        <html>
-            <head><title>Beyonder v3 - Pairing</title></head>
-            <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
-                <h1>🔗 Beyonder v3</h1>
-                <p>Usa este código en tu WhatsApp (Dispositivos vinculados > Vincular con número de teléfono):</p>
-                <div style="font-size: 3em; font-weight: bold; color: #4CAF50; letter-spacing: 5px; margin: 20px 0; border: 2px dashed #4CAF50; padding: 20px; display: inline-block;">
-                    {code}
-                </div>
-                <p style="margin-top: 20px; color: #888;">El código expira en unos minutos. Refresca si es necesario.</p>
-                <script>setInterval(() => location.reload(), 15000);</script>
-            </body>
-        </html>
-        """, media_type="text/html")
+        try:
+            with open("pairing.txt", "r") as f:
+                code = f.read().strip()
+            return Response(content=f"""
+            <html>
+                <head>
+                    <title>Beyonder v4 - Pairing Code</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body {{ text-align: center; font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding-top: 50px; }}
+                        .card {{ background: #111; border: 1px solid #333; padding: 30px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
+                        h1 {{ color: #0088ff; margin-bottom: 10px; }}
+                        .code {{ font-size: 3.5em; font-weight: bold; color: #00ff88; letter-spacing: 8px; margin: 30px 0; border: 2px dashed #00ff88; padding: 25px; border-radius: 10px; background: rgba(0,255,136,0.05); }}
+                        .footer {{ margin-top: 30px; color: #666; font-size: 0.9em; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>🔗 Beyonder v4</h1>
+                        <p>Usa este código en tu WhatsApp:</p>
+                        <p style="font-size: 0.9em; color: #aaa;">(Dispositivos vinculados > Vincular con número de teléfono)</p>
+                        <div class="code">{code}</div>
+                        <p style="color: #ffaa00;">⚠️ El código expira pronto.</p>
+                    </div>
+                    <div class="footer">
+                        <p>Beyonder Engine v4.0 | Pairing Mode Active</p>
+                    </div>
+                    <script>setInterval(() => location.reload(), 15000);</script>
+                </body>
+            </html>
+            """, media_type="text/html")
+        except:
+            pass
     
+    # 3. Estado normal (Bot conectado)
     return Response(content="""
     <html>
-        <head><title>Beyonder v3 - Estado</title></head>
-        <body style="text-align: center; font-family: sans-serif; background: #111; color: white; padding-top: 50px;">
-            <h1>🚀 Beyonder v3</h1>
-            <p>Bot iniciado correctamente.</p>
-            <p style="color: #4CAF50;">✅ Sistema IA (NudeNet + CLIP + LLM) cargado y listo.</p>
-            <p style="margin-top: 20px; color: #888;">Esperando eventos de WhatsApp...</p>
+        <head>
+            <title>Beyonder v4 - Online</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { text-align: center; font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding-top: 50px; }
+                .card { background: #111; border: 1px solid #333; padding: 30px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+                h1 { color: #00ff88; margin-bottom: 10px; }
+                .status-badge { background: rgba(0,255,136,0.1); color: #00ff88; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; border: 1px solid #00ff88; }
+                .features { text-align: left; margin-top: 20px; font-size: 0.9em; color: #aaa; }
+                .features li { margin-bottom: 5px; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>🚀 Beyonder v4</h1>
+                <div style="margin-bottom: 20px;"><span class="status-badge">● ONLINE</span></div>
+                <p>Bot iniciado correctamente y conectado.</p>
+                <div class="features">
+                    <p>Sistemas activos:</p>
+                    <ul>
+                        <li>✅ IA Neural (Qwen 2.5)</li>
+                        <li>✅ Visión Artificial (CLIP + NudeNet)</li>
+                        <li>✅ Detección de Gore & NSFW</li>
+                        <li>✅ EventBus Engine v4</li>
+                    </ul>
+                </div>
+            </div>
+            <script>setInterval(() => location.reload(), 30000);</script>
         </body>
     </html>
     """, media_type="text/html")
@@ -208,14 +265,6 @@ async def get_ia_response(req: IARequest):
     except Exception as e:
         print(f"❌ Error en LLM: {str(e)}")
         return {"response": "Ugh, mi mente está tan llena de pensamientos sucios sobre ti que mi sistema se colgó... 😏"}
-
-@app.get("/")
-def home():
-    return {
-        "status": "Beyonder IA Online", 
-        "mode": "Hugging Face Space (CLIP + NudeNet)",
-        "features": ["NSFW Detection", "Gore Detection", "Semantic Validation"]
-    }
 
 @app.post("/detect/nsfw")
 async def detect_nsfw_endpoint(file: UploadFile = File(...)):

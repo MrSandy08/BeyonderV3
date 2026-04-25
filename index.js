@@ -66,7 +66,9 @@ const conectarWhatsApp = async () => {
       auth:                state,
       logger:              pino({ level: "silent" }),
       markOnlineOnConnect: false,
-      printQRInTerminal:   true, 
+      printQRInTerminal:   false, 
+      connectTimeoutMs:    60000,
+      keepAliveIntervalMs: 30000,
     });
 
     currentSock = sock;

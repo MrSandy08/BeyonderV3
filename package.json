@@ -4,7 +4,7 @@
   "description": "Beyonder v3 — Roleplay, IA y Moderación Organizada",
   "main": "index.js",
   "type": "module",
-a  "scripts": {
+  "scripts": {
     "start": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
     "start:hf": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
     "dev": "node --watch index.js"

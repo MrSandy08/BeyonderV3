@@ -3,8 +3,8 @@ import { Schema, model } from "mongoose";
 
 const AffinitySchema = new Schema(
   {
-    jid: { type: String, required: true, index: true },
-    communityId: { type: String, required: true, index: true },
+    jid: { type: String, required: true },
+    communityId: { type: String, required: true },
     points: { type: Number, default: 0 }, // -100 a 100
     status: { type: String, default: "Desconocido" }, // Mejor amigo, Enemigo, Desconocido, etc.
     interactions: { type: Number, default: 0 },
@@ -22,6 +22,8 @@ const AffinitySchema = new Schema(
 
 // Índice para buscar afinidad por usuario en una comunidad específica
 AffinitySchema.index({ jid: 1, communityId: 1 }, { unique: true });
+AffinitySchema.index({ jid: 1 });
+AffinitySchema.index({ communityId: 1 });
 
 const Affinity = model("Affinity", AffinitySchema);
 

@@ -16,6 +16,7 @@ import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
 import pluginLoader   from "./src/classes/PluginLoader.js";
 import handleMessages from "./src/events/messages.js";
+import { init }        from "./src/index.js";
 import { handleGroupParticipantsUpdate, handleGroupUpdate } from "./src/events/groupUpdate.js";
 import { checkGroupInactivity } from "./src/services/initiativeService.js";
 import { startDashboard } from "./src/dashboard/server.js";

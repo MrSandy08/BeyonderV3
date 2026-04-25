@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 const schema = new mongoose.Schema(
   {
-    groupId:       { type: String, required: true, unique: true, index: true },
+    groupId:       { type: String, required: true, unique: true },
     communityId:   { type: String, index: true }, // ID de la comunidad (compartido entre grupos)
     esPrincipal:   { type: Boolean, default: false },
     esSecundaria:  { type: Boolean, default: false },

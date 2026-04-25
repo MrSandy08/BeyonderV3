@@ -43,7 +43,6 @@ const UserSchema = new Schema(
       type:     String,
       required: true,
       default:  "global", // Para usuarios que no están en una comunidad específica
-      index:    true,
     },
     groupId: {
       type:     String,

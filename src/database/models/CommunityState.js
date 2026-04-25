@@ -3,7 +3,7 @@ import { Schema, model } from "mongoose";
 
 const CommunityStateSchema = new Schema(
   {
-    communityId: { type: String, required: true, unique: true, index: true },
+    communityId: { type: String, required: true, unique: true },
     mood: { type: String, default: "Neutral" }, // Triste, Eufórico, Enojado, Neutral
     tension: { type: Number, default: 0 }, // 0 a 100
     lastMajorEvent: {

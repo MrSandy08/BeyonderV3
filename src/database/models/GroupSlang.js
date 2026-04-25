@@ -3,7 +3,7 @@ import { Schema, model } from "mongoose";
 
 const GroupSlangSchema = new Schema(
   {
-    communityId: { type: String, required: true, index: true },
+    communityId: { type: String, required: true },
     word: { type: String, required: true },
     count: { type: Number, default: 1 },
     lastUsed: { type: Date, default: Date.now }
@@ -13,6 +13,7 @@ const GroupSlangSchema = new Schema(
 
 // Índice único por comunidad y palabra
 GroupSlangSchema.index({ communityId: 1, word: 1 }, { unique: true });
+GroupSlangSchema.index({ communityId: 1 });
 
 const GroupSlang = model("GroupSlang", GroupSlangSchema);
 

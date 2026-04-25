@@ -181,7 +181,7 @@ const main = async () => {
   try {
     // 1. Iniciar Dashboard INMEDIATAMENTE
     // HF Spaces mata el contenedor si el puerto 7860 no abre en < 60s.
-    console.log("🌐 [1/4] Abriendo puerto 7860 (Dashboard)...");
+    console.log(`🌐 [1/4] Abriendo puerto ${PORT} (Dashboard)...`);
     startDashboard(() => currentSock);
 
     // 2. Base de datos (con timeout de seguridad)

@@ -11,7 +11,9 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 export const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/beyonder";
 export const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-export const PORT = process.env.PORT || 7860;
+// Puerto para Hugging Face Spaces (Obligatorio 7860) o local
+export const PORT = process.env.HF_SPACE_ID || process.env.SPACE_ID ? 7860 : (parseInt(process.env.PORT) || 7860);
+export const SESSION_ID = process.env.SESSION_ID || "";
 export const PREFIX = process.env.PREFIX || "!";
 export const COMMUNITY_ID = process.env.COMMUNITY_ID || "global";
 export const OWNERS = process.env.OWNER_JID

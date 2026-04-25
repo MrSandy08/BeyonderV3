@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 const schema = new mongoose.Schema(
   {
     groupId:       { type: String, required: true, unique: true },
-    communityId:   { type: String, index: true }, // ID de la comunidad (compartido entre grupos)
+    communityId:   { type: String }, // ID de la comunidad (compartido entre grupos)
     esPrincipal:   { type: Boolean, default: false },
     esSecundaria:  { type: Boolean, default: false },
     botActivo:     { type: Boolean, default: true  },
@@ -24,6 +24,9 @@ const schema = new mongoose.Schema(
   },
   { timestamps: true, versionKey: false }
 );
+
+schema.index({ communityId: 1 });
+schema.index({ groupId: 1 }, { unique: true });
 
 let Config;
 try   { Config = mongoose.model("Config"); }

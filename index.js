@@ -16,7 +16,7 @@ import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
 import pluginLoader   from "./src/classes/PluginLoader.js";
 import handleMessages from "./src/events/messages.js";
-import { init }        from "./src/index.js";
+import { initCore }      from "./src/index.js";
 import { handleGroupParticipantsUpdate, handleGroupUpdate } from "./src/events/groupUpdate.js";
 import { checkGroupInactivity } from "./src/services/initiativeService.js";
 import { startDashboard } from "./src/dashboard/server.js";
@@ -167,7 +167,7 @@ const conectarWhatsApp = async () => {
     return sock;
   } catch (err) {
     console.error("❌ Error fatal en conectarWhatsApp:", err.message);
-    setTimeout(() => conectarWhatsApp(comandos), 10000);
+    setTimeout(() => conectarWhatsApp(), 10000);
   }
 };
 
@@ -194,7 +194,7 @@ const main = async () => {
 
     // 3. Inicializar Core V4 (Carga de Comandos, Schedulers, Módulos)
     console.log("📂 [3/4] Inicializando Core Beyonder V4...");
-    await init();
+    await initCore();
 
     // 4. Conectar a WhatsApp
     console.log("📲 [4/4] Iniciando socket de WhatsApp...");

@@ -7,7 +7,7 @@ import "./modules/moderation/index.js";
 import "./modules/moderation/antiflood.js";
 import { startScheduler } from "./core/scheduler.js"; 
  
-export const init = async () => { 
+export const initCore = async () => { 
   await loadCommands(); 
   startScheduler(); 
 }; 

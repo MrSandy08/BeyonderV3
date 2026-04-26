@@ -5,8 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
-    "start:hf": "concurrently \"uvicorn main:app --host 127.0.0.1 --port 8000\" \"node index.js\"",
+    "start": "concurrently \"python3 -m uvicorn main:app --host 0.0.0.0 --port 8000\" \"node index.js\"",
+    "start:hf": "concurrently \"python3 -m uvicorn main:app --host 0.0.0.0 --port 8000\" \"node index.js\"",
     "dev": "node --watch index.js"
   },
   "dependencies": {

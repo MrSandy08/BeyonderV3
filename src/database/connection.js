@@ -26,15 +26,41 @@ const connectDB = async () => {
     // 2. Conectar a Redis (Caché)
     try {
       redisClient = createClient({
-        url: REDIS_URL || "redis://localhost:6379"
+        url: REDIS_URL || "redis://localhost:6379",
+        socket: {
+          connectTimeout: 5000,
+          reconnectStrategy: (retries) => {
+            if (retries > 3) {
+              console.warn("⚠️  Redis desconectado. Máximos reintentos alcanzados. El bot funcionará sin caché.");
+              return false; // Detener reintentos
+            }
+            return 10000; // Reintentar cada 10s
+          }
+        }
       });
 
-      redisClient.on("error", (err) => console.error("❌ Redis Error:", err));
+      redisClient.on("error", (err) => {
+        // Silenciar errores de conexión (ya manejados en reconnectStrategy y el catch inicial)
+        if (err.code === 'ECONNREFUSED' || err.message.includes('ECONNREFUSED')) {
+          return;
+        }
+        console.error("❌ Redis Error:", err);
+      });
+
       redisClient.on("connect", () => console.log("✅ Redis conectado"));
 
-      await redisClient.connect();
+      await redisClient.connect().catch(err => {
+        // Silencio total para ECONNREFUSED en el arranque
+        if (err.code !== 'ECONNREFUSED') {
+          console.warn("⚠️  Error al conectar a Redis:", err.message);
+        }
+        redisClient = null;
+      });
     } catch (redisErr) {
-      console.warn("⚠️  Redis no disponible. El bot funcionará sin caché (más lento).", redisErr.message);
+      // Si llegamos aquí es un error de inicialización, no de conexión
+      if (redisErr.code !== 'ECONNREFUSED') {
+        console.warn("⚠️  Error al inicializar Redis. Continuando sin caché.", redisErr.message);
+      }
       redisClient = null;
     }
   } catch (error) {

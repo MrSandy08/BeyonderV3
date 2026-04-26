@@ -26,7 +26,6 @@ const schema = new mongoose.Schema(
 );
 
 schema.index({ communityId: 1 });
-schema.index({ groupId: 1 }, { unique: true });
 
 let Config;
 try   { Config = mongoose.model("Config"); }

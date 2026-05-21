@@ -87,9 +87,6 @@ async function startBot() {
       console.log("✅ Conectado a WhatsApp!");
       if (fs.existsSync("qr.png")) fs.unlinkSync("qr.png");
       if (fs.existsSync("pairing.txt")) fs.unlinkSync("pairing.txt");
-      
-      // 4. Cargar datos locales de usuarios
-      await UserClass.loadCache();
     }
   });
 

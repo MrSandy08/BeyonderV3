@@ -48,7 +48,7 @@ async function startBot() {
 
   sock = makeWASocket({
     version,
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     auth: state,
     logger: pino({ level: "silent" }),
     browser: ["Beyonder v3", "Chrome", "120.0.0.0"],
@@ -59,15 +59,14 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (update) => {
-    const { connection, qr, lastDisconnect } = update;
+    const { connection, qr, lastDisconnect, pairingCode } = update;
 
-    if (qr) {
-      console.log("📱 Escanea el QR para iniciar sesión...");
-      qrcodeTerminal.generate(qr, { small: true });
+    if (pairingCode) {
+      console.log("📱 Código de vinculación:", pairingCode);
       try {
-        await qrcode.toFile("qr.png", qr);
+        await fs.promises.writeFile("pairing.txt", pairingCode);
       } catch (e) {
-        console.warn("⚠️ No se pudo guardar el QR en archivo:", e.message);
+        console.warn("⚠️ No se pudo guardar el código en archivo:", e.message);
       }
     }
 
@@ -91,6 +90,22 @@ async function startBot() {
       await UserClass.loadCache();
     }
   });
+
+  if (!sock.authState.creds.registered) {
+    if (!PHONE_NUMBER) {
+      console.error("❌ PHONE_NUMBER no está definido en .env");
+      process.exit(1);
+    }
+    console.log("🔑 Generando código de vinculación...");
+    const phoneNumber = PHONE_NUMBER.replace(/[^0-9]/g, "");
+    const code = await sock.requestPairingCode(phoneNumber);
+    console.log("📱 Código de vinculación:", code);
+    try {
+      await fs.promises.writeFile("pairing.txt", code);
+    } catch (e) {
+      console.warn("⚠️ No se pudo guardar el código en archivo:", e.message);
+    }
+  }
 
   sock.ev.on("messages.upsert", async (m) => {
     if (!m.messages) return;

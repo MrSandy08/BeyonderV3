@@ -10,7 +10,10 @@ WORKDIR /app
 # Copiamos archivos de dependencias
 COPY package.json ./
 
-# Instalamos dependencias de Node.js
+# 1. Obliga a descargar por HTTPS en vez de SSH
+RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+# 2. Ahora sí, instalamos dependencias de Node.js
 RUN npm install --production
 
 # Copiamos el resto del código

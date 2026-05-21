@@ -1,68 +1,27 @@
 // src/database/connection.js
 import mongoose from "mongoose";
-import { createClient } from "redis";
-import { MONGO_URI, REDIS_URL } from "../config.js";
+import { MONGO_URI } from "../config.js";
 
 /**
- * Beyonder v4: Database Connection Manager
+ * Beyonder v4: Database Connection Manager (Optimizado para HF Spaces)
  * Gestiona MongoDB y la Capa de Caché con Redis.
  */
 let redisClient = null;
 
 const connectDB = async () => {
   try {
-    // 1. Conectar a MongoDB
+    // 1. Conectar a MongoDB (sin Redis para reducir el uso de memoria)
     if (!MONGO_URI) {
       throw new Error("MONGO_URI no está definido en el entorno.");
     }
     await mongoose.connect(MONGO_URI, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 15000,
       family: 4,
     });
     console.log("✅ MongoDB conectado");
 
-    // 2. Conectar a Redis (Caché)
-    try {
-      redisClient = createClient({
-        url: REDIS_URL || "redis://localhost:6379",
-        socket: {
-          connectTimeout: 5000,
-          reconnectStrategy: (retries) => {
-            if (retries > 3) {
-              console.warn("⚠️  Redis desconectado. Máximos reintentos alcanzados. El bot funcionará sin caché.");
-              return false; // Detener reintentos
-            }
-            return 10000; // Reintentar cada 10s
-          }
-        }
-      });
-
-      redisClient.on("error", (err) => {
-        // Silenciar errores de conexión (ya manejados en reconnectStrategy y el catch inicial)
-        if (err.code === 'ECONNREFUSED' || err.message.includes('ECONNREFUSED')) {
-          return;
-        }
-        console.error("❌ Redis Error:", err);
-      });
-
-      redisClient.on("connect", () => console.log("✅ Redis conectado"));
-
-      await redisClient.connect().catch(err => {
-        // Silencio total para ECONNREFUSED en el arranque
-        if (err.code !== 'ECONNREFUSED') {
-          console.warn("⚠️  Error al conectar a Redis:", err.message);
-        }
-        redisClient = null;
-      });
-    } catch (redisErr) {
-      // Si llegamos aquí es un error de inicialización, no de conexión
-      if (redisErr.code !== 'ECONNREFUSED') {
-        console.warn("⚠️  Error al inicializar Redis. Continuando sin caché.", redisErr.message);
-      }
-      redisClient = null;
-    }
   } catch (error) {
     console.error("❌ Error al conectar con las bases de datos:", error.message);
     process.exit(1);

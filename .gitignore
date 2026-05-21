@@ -4,3 +4,4 @@ auth_info_baileys
 .venv
 tmp/
 auth_info
+__pycache__/

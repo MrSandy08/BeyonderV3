@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path"; 
 import { pathToFileURL } from "url";
 import chokidar from "chokidar";
+import config from "../config.js";
+import User from "../classes/User.js";
 
 const commands = new Map(); 
 const aliases = new Map();
@@ -61,12 +63,50 @@ const startWatcher = (basePath) => {
     await loadCommandFile(filePath);
   });
 };
+
+const checkPermissions = async (cmd, ctx) => {
+  const isOwner = config.OWNERS.includes(ctx.sender);
+  
+  if (cmd.onlyOwner && !isOwner) {
+    const dbUser = await User.get(ctx.sender, ctx.communityId);
+    if (!dbUser || !dbUser.isOwner(config.OWNERS)) {
+      return false;
+    }
+  }
+  
+  if (cmd.onlyMod) {
+    const dbUser = await User.get(ctx.sender, ctx.communityId);
+    if (!dbUser || !dbUser.isMod()) {
+      const isOwnerCheck = config.OWNERS.includes(ctx.sender) || (dbUser && dbUser.isOwner(config.OWNERS));
+      if (!isOwnerCheck) {
+        return false;
+      }
+    }
+  }
+  
+  if (cmd.onlyAdmin) {
+    const dbUser = await User.get(ctx.sender, ctx.communityId);
+    if (!dbUser || !dbUser.isHelper()) {
+      const isOwnerCheck = config.OWNERS.includes(ctx.sender) || (dbUser && dbUser.isOwner(config.OWNERS));
+      const isModCheck = dbUser && dbUser.isMod();
+      if (!isOwnerCheck && !isModCheck) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+};
  
 export const executeCommand = async (ctx) => { 
   const cmd = commands.get(ctx.command) || aliases.get(ctx.command); 
   if (!cmd) return; 
  
   try { 
+    const hasPermission = await checkPermissions(cmd, ctx);
+    if (!hasPermission) {
+      return ctx.reply("❌ No tienes permisos para usar este comando.");
+    }
     await cmd.run(ctx); 
   } catch (err) { 
     console.error(`Error comando ${ctx.command}:`, err); 

@@ -1,1 +1,0 @@
-# No dependencias de Python para este modo ligero

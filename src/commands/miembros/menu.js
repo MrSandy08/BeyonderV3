@@ -1,5 +1,5 @@
-// src/comandos/general/menu.js
-import { header, category, cmdLine, aviso } from "../../utils/format.js";
+// src/commands/miembros/menu.js
+import { header, category, cmdLine, aviso } from "../../format.js";
 
 export const name      = "menu";
 export const aliases   = ["smenu", "pmenu", "ayuda", "help"];
@@ -31,6 +31,7 @@ cmdLine("✅","aceptar / rechazar", "Responder a una solicitud (marry, adoptar..
 category("𝓖eneral"),
 cmdLine("⚡","ping",             "Verificar que el bot está activo."),
 cmdLine("🎵","play [nombre]",    "Buscar y descargar música o videos."),
+cmdLine("🤖","ia [texto]",       "Chatea con Beyonder (IA)."),
 cmdLine("👤","apodo [nick]",     "Cambiar tu apodo en el grupo."),
 cmdLine("💡","sugerencia",       "Envía una sugerencia para el bot."),
 cmdLine("🚩","reporte",         "Reporta un problema o usuario."),

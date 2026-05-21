@@ -11,12 +11,6 @@ import pluginLoader from "../classes/PluginLoader.js";
 /**
  * Beyonder v4.3: Control Dashboard with Real-time Logs & Gravity Filters
  */
-let nluActive = true; 
-
-/**
- * Beyonder v4.4: Exporta el estado de NLU para ser usado en el intentHandler
- */
-export const isNluActive = () => nluActive;
 
 export const startDashboard = (getSock) => {
   const app = express();
@@ -51,7 +45,7 @@ export const startDashboard = (getSock) => {
       const time = new Date().toLocaleTimeString();
       fs.appendFileSync(logFile, `[${time}] [${type.toUpperCase()}] ${msg}\n`);
     } catch (e) {
-      // Ignorar fallos de escritura en disco (por si HF Space es Read-Only)
+      // Ignorar fallos de escritura en disco
     }
   };
 
@@ -69,24 +63,18 @@ export const startDashboard = (getSock) => {
   };
 
   io.on('connection', (socket) => {
-    socket.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs, nlu: nluActive });
+    socket.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs });
     
     socket.on('toggle-streaming', () => {
       logStreamingActive = !logStreamingActive;
-      io.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs, nlu: nluActive });
+      io.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs });
       console.log(`📡 [Dashboard] Streaming de logs: ${logStreamingActive ? 'ACTIVADO' : 'PAUSADO'}`);
     });
 
     socket.on('toggle-critical', () => {
       onlyCriticalLogs = !onlyCriticalLogs;
-      io.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs, nlu: nluActive });
+      io.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs });
       console.log(`🛡️ [Dashboard] Modo Crítico: ${onlyCriticalLogs ? 'ACTIVADO' : 'DESACTIVADO'}`);
-    });
-
-    socket.on('toggle-nlu', () => {
-      nluActive = !nluActive;
-      io.emit('stream-status', { active: logStreamingActive, critical: onlyCriticalLogs, nlu: nluActive });
-      console.log(`🧠 [Dashboard] NLU/Groq: ${nluActive ? 'ACTIVADO' : 'DESACTIVADO'}`);
     });
 
     // Enviar lista inicial de usuarios online
@@ -170,7 +158,6 @@ export const startDashboard = (getSock) => {
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0;">Terminal de Logs</h3>
                     <div style="display: flex; gap: 5px;">
-                      <button id="nluBtn" class="btn reload" onclick="socket.emit('toggle-nlu')">🧠 NLU: ON</button>
                       <button id="criticalBtn" class="btn critical-btn" onclick="socket.emit('toggle-critical')">🛡️ Modo Crítico</button>
                       <button id="toggleBtn" class="btn" style="background: #333; color: white;" onclick="socket.emit('toggle-streaming')">⏸️ Pausar</button>
                     </div>
@@ -209,7 +196,6 @@ export const startDashboard = (getSock) => {
               const logDiv = document.getElementById('logs');
               const toggleBtn = document.getElementById('toggleBtn');
               const criticalBtn = document.getElementById('criticalBtn');
-              const nluBtn = document.getElementById('nluBtn');
               const userList = document.getElementById('users');
               const userCount = document.getElementById('userCount');
 
@@ -257,15 +243,6 @@ export const startDashboard = (getSock) => {
                 } else {
                   criticalBtn.classList.remove('critical-active');
                   criticalBtn.innerHTML = '🛡️ Modo Crítico: OFF';
-                }
-
-                // NLU Status
-                if (status.nlu) {
-                  nluBtn.innerHTML = '🧠 NLU: ON';
-                  nluBtn.style.background = '#0088ff';
-                } else {
-                  nluBtn.innerHTML = '🧠 NLU: OFF';
-                  nluBtn.style.background = '#444';
                 }
               });
 

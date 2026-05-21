@@ -1,16 +1,1 @@
-fastapi
-uvicorn
-python-multipart
-nudenet
-pillow
-onnxruntime
-torch
-torchvision
-ftfy
-regex
-tqdm
-transformers
-accelerate
-sentencepiece
-pydantic
-typing-extensions
+# No dependencias de Python para este modo ligero

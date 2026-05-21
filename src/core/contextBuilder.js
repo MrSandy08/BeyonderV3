@@ -1,6 +1,8 @@
 import config from "../config.js";
 
 export const buildContext = (msg, sock) => { 
+  console.log("🔍 [MSG] Full message object:", JSON.stringify(msg, null, 2));
+  
   const body = 
     msg.message?.conversation || 
     msg.message?.extendedTextMessage?.text || 
@@ -13,7 +15,14 @@ export const buildContext = (msg, sock) => {
   const [commandRaw, ...args] = isCommand ? body.slice(1).trim().split(/\s+/) : ["", ""]; 
  
   const from = msg.key.remoteJid;
-  const sender = msg.key.participant || from;
+  let sender = msg.key.participant || from;
+  
+  // Check for participantAlt to get real JID instead of LID
+  if (msg.participantAlt) {
+    console.log("🔍 [MSG] Using participantAlt:", msg.participantAlt);
+    sender = msg.participantAlt;
+  }
+  
   const senderName = msg.pushName || sender.split("@")[0];
 
   return { 

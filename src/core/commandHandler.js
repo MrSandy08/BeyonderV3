@@ -65,20 +65,34 @@ const startWatcher = (basePath) => {
 };
 
 const checkPermissions = async (cmd, ctx) => {
+  console.log("🔍 [PERMISOS] Verificando permisos para:", ctx.sender);
+  console.log("🔍 [PERMISOS] Comando:", cmd.name);
+  console.log("🔍 [PERMISOS] onlyOwner:", cmd.onlyOwner);
+  console.log("🔍 [PERMISOS] onlyMod:", cmd.onlyMod);
+  console.log("🔍 [PERMISOS] onlyAdmin:", cmd.onlyAdmin);
+  console.log("🔍 [PERMISOS] config.OWNERS:", config.OWNERS);
+  console.log("🔍 [PERMISOS] ctx.communityId:", ctx.communityId);
+  
   const isOwner = config.OWNERS.includes(ctx.sender);
+  console.log("🔍 [PERMISOS] isOwner (config):", isOwner);
   
   if (cmd.onlyOwner && !isOwner) {
     const dbUser = await User.get(ctx.sender, ctx.communityId);
+    console.log("🔍 [PERMISOS] dbUser (onlyOwner):", dbUser?.data);
     if (!dbUser || !dbUser.isOwner(config.OWNERS)) {
+      console.log("❌ [PERMISOS] No es owner");
       return false;
     }
   }
   
   if (cmd.onlyMod) {
     const dbUser = await User.get(ctx.sender, ctx.communityId);
+    console.log("🔍 [PERMISOS] dbUser (onlyMod):", dbUser?.data);
     if (!dbUser || !dbUser.isMod()) {
       const isOwnerCheck = config.OWNERS.includes(ctx.sender) || (dbUser && dbUser.isOwner(config.OWNERS));
+      console.log("🔍 [PERMISOS] isOwnerCheck (onlyMod):", isOwnerCheck);
       if (!isOwnerCheck) {
+        console.log("❌ [PERMISOS] No es mod ni owner");
         return false;
       }
     }
@@ -86,15 +100,20 @@ const checkPermissions = async (cmd, ctx) => {
   
   if (cmd.onlyAdmin) {
     const dbUser = await User.get(ctx.sender, ctx.communityId);
+    console.log("🔍 [PERMISOS] dbUser (onlyAdmin):", dbUser?.data);
     if (!dbUser || !dbUser.isHelper()) {
       const isOwnerCheck = config.OWNERS.includes(ctx.sender) || (dbUser && dbUser.isOwner(config.OWNERS));
       const isModCheck = dbUser && dbUser.isMod();
+      console.log("🔍 [PERMISOS] isOwnerCheck (onlyAdmin):", isOwnerCheck);
+      console.log("🔍 [PERMISOS] isModCheck (onlyAdmin):", isModCheck);
       if (!isOwnerCheck && !isModCheck) {
+        console.log("❌ [PERMISOS] No es admin, mod ni owner");
         return false;
       }
     }
   }
   
+  console.log("✅ [PERMISOS] Permisos concedidos!");
   return true;
 };
  

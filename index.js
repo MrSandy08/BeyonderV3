@@ -173,7 +173,7 @@ const conectarWhatsApp = async () => {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  3. ARRANQUE PRINCIPAL
-//     Orden garantizado: BD → Comandos → WhatsApp
+//     Orden garantizado: Dashboard → BD → Comandos → WhatsApp
 // ════════════════════════════════════════════════════════════════════════════
 const main = async () => {
   console.log("🚀 Iniciando Beyonder v4 (HF Spaces Optimized)...\n");
@@ -185,7 +185,7 @@ const main = async () => {
     startDashboard(() => currentSock);
 
     // 2. Base de datos (con timeout de seguridad)
-    console.log("📂 [2/4] Conectando a MongoDB & Redis...");
+    console.log("📂 [2/4] Conectando a MongoDB...");
     if (!MONGO_URI) {
       console.error("❌ ERROR: MONGO_URI no configurada en las Secret Vars de HF.");
       process.exit(1);
@@ -196,14 +196,17 @@ const main = async () => {
     console.log("📂 [3/4] Inicializando Core Beyonder V4...");
     await initCore();
 
-    // 4. Conectar a WhatsApp
+    // 4. Conectar a WhatsApp (ahora opcional para que el dashboard no se bloquee)
     console.log("📲 [4/4] Iniciando socket de WhatsApp...");
-    await conectarWhatsApp();
+    try {
+      await conectarWhatsApp();
+    } catch (whatsappErr) {
+      console.warn("⚠️ Error al conectar a WhatsApp, pero el dashboard sigue activo:", whatsappErr.message);
+    }
 
   } catch (err) {
     console.error("❌ ERROR CRÍTICO DURANTE EL ARRANQUE:", err.message);
-    // En HF Spaces es mejor no salir para que el Dashboard siga vivo y podamos ver el error en el log web
-    // Pero si no hay conexión a DB, el bot no sirve de nada.
+    // En HF Spaces es mejor NO salir para que el Dashboard siga vivo y podamos ver el error en el log web
   }
 };
 

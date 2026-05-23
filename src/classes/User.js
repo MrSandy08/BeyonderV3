@@ -204,6 +204,15 @@ class User {
     // y dejar que el sync periódico lo haga cada 5 min.
   }
 
+  // ── Métodos SUA-Bot ────────────────────────────────────────────────────
+
+  async incrementMensajesCount() {
+    this.data.mensajes = (this.data.mensajes || 0) + 1;
+    this.data.lastSeen = new Date();
+    this.markDirty();
+    await this.saveToCache();
+  }
+
   // ── Métodos de Permisos ────────────────────────────────────────────────────
 
   isOwner(ownerList = []) {

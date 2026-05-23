@@ -11,6 +11,7 @@ import pino from "pino";
 import qrcodeTerminal from "qrcode-terminal";
 import qrcode from "qrcode";
 import fs from "fs";
+import moment from "moment";
 
 import connectDB      from "./src/database/connection.js";
 import config         from "./src/config.js";
@@ -19,6 +20,7 @@ import handleMessages from "./src/events/messages.js";
 import { initCore }      from "./src/index.js";
 import { handleGroupParticipantsUpdate, handleGroupUpdate } from "./src/events/groupUpdate.js";
 import { startDashboard } from "./src/dashboard/server.js";
+import User from "./src/database/models/User.js";
 
 import UserClass      from "./src/classes/User.js";
 
@@ -27,6 +29,19 @@ const { MONGO_URI, PORT, PHONE_NUMBER, OWNERS } = config;
 let sock = null;
 
 const getSock = () => sock;
+
+// Función para procesar excusas diariamente
+const dailyJob = async () => {
+  console.log('Ejecutando job diario de excusas...');
+  const users = await User.find({ 'excusa.activa': true });
+  for (let u of users) {
+    if (moment().isAfter(moment(u.excusa.fin))) {
+      u.excusa.activa = false;
+      await u.save();
+    }
+  }
+  console.log('Job diario completado.');
+};
 
 async function startBot() {
   console.log("🚀 Iniciando Beyonder v3...");
@@ -106,6 +121,9 @@ async function startBot() {
   sock.ev.on("groups.update", async (updates) => {
     await handleGroupUpdate(updates, sock);
   });
+  
+  // Programar job diario (cada 24h)
+  setInterval(() => dailyJob(), 24 * 60 * 60 * 1000);
 }
 
 startDashboard(getSock);

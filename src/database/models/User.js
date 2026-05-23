@@ -68,9 +68,17 @@ const UserSchema = new Schema(
       type:    Number,
       default: 0,
     },
+    mensajes: {
+      type:    Number,
+      default: 0,
+    },
     lastMessage: {
       type:    Date,
       default: null,
+    },
+    lastSeen: {
+      type:    Date,
+      default: Date.now,
     },
 
     // ── Economía ─────────────────────────────────────────────────────────────
@@ -133,9 +141,21 @@ const UserSchema = new Schema(
       type:    [AdvSchema],
       default: [],
     },
+    advertencias: [
+      {
+        razon: String,
+        admin: String,
+        fecha: { type: Date, default: Date.now }
+      }
+    ],
 
     // ── Sistema RP ────────────────────────────────────────────────────────────
     personaje: {
+      type:    String,
+      default: null,
+      trim:    true,
+    },
+    fandom: {
       type:    String,
       default: null,
       trim:    true,
@@ -154,6 +174,11 @@ const UserSchema = new Schema(
       motivo:      { type: String,  default: null },
       fechaExpira: { type: Date,    default: null },
       activa:      { type: Boolean, default: false },
+    },
+    excusa: {
+      fin: Date,
+      razon: String,
+      activa: { type: Boolean, default: false }
     },
 
     // ── Contexto de IA (Ollama) ───────────────────────────────────────────────
@@ -177,6 +202,7 @@ UserSchema.index({ personaje: 1 });
 UserSchema.index({ money: -1 });
 UserSchema.index({ msgCount: -1 });
 UserSchema.index({ communityId: 1 });
+UserSchema.index({ fandom: 1 });
 
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 

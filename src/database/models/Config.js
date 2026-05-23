@@ -1,33 +1,15 @@
-// src/database/models/Config.js
-import mongoose from "mongoose";
+import { Schema, model } from "mongoose";
 
-const schema = new mongoose.Schema(
-  {
-    groupId:       { type: String, required: true, unique: true },
-    communityId:   { type: String }, // ID de la comunidad (compartido entre grupos)
-    esPrincipal:   { type: Boolean, default: false },
-    esSecundaria:  { type: Boolean, default: false },
-    botActivo:     { type: Boolean, default: true  },
-    antilink:      { type: Boolean, default: false },
-    antiporn:      { type: Boolean, default: false }, // Para links
-    antinsfw:      { type: Boolean, default: false }, // Para media (IA)
-    antigore:      { type: Boolean, default: false }, // Para media (CLIP)
-    antiflood:     { type: Boolean, default: false },
-    lockRp:        { type: Boolean, default: false },
-    lockAntilink:  { type: Boolean, default: false },
-    lockAntiporn:  { type: Boolean, default: false },
-    lockAntinsfw:  { type: Boolean, default: false },
-    lockAntigore:  { type: Boolean, default: false },
-    lockAntifiltro: { type: Boolean, default: false }, // Bloquea antinsfw y antigore
-    lockAntiflood: { type: Boolean, default: false },
-    economyActive: { type: Boolean, default: true  },
+const ConfigSchema = new Schema({
+  _id: { type: String, default: "global" },
+  antispam: {
+    enabled: { type: Boolean, default: false },
+    limit: { type: Number, default: 5 },
+    seconds: { type: Number, default: 10 }
   },
-  { timestamps: true, versionKey: false }
-);
+  maxAdvertencias: { type: Number, default: 3 },
+  minInactividad: { type: Number, default: 3 }
+});
 
-schema.index({ communityId: 1 });
-
-let Config;
-try   { Config = mongoose.model("Config"); }
-catch { Config = mongoose.model("Config", schema); }
+const Config = model("Config", ConfigSchema);
 export default Config;

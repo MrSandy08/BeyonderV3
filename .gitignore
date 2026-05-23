@@ -5,3 +5,7 @@ auth_info_baileys
 tmp/
 auth_info
 __pycache__/
+logs/
+package-lock.json
+qr.png
+pairing.txt

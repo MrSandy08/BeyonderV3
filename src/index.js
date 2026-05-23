@@ -9,4 +9,4 @@ import { startScheduler } from "./core/scheduler.js";
 export const initCore = async () => { 
   await loadCommands(); 
   startScheduler(); 
-}; 
+};
